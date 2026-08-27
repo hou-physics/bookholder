@@ -263,4 +263,66 @@ mod tests {
         bump_counter(&conn, "bad_lines", 2).unwrap();
         assert_eq!(meta_get(&conn, "bad_lines").as_deref(), Some("5"));
     }
+
+    #[test]
+    fn wal_mode_enabled_on_file_db() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("subdir").join("test.db");
+
+        let conn = open_db(&db_path).unwrap();
+
+        // Verify WAL mode is active
+        let mode: String = conn.query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap();
+        assert_eq!(mode.to_lowercase(), "wal");
+
+        // Verify directory was created
+        assert!(db_path.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn session_time_aggregation_min_max() {
+        let conn = open_memory().unwrap();
+
+        // Insert event 1 at 02:00
+        let mut e1 = ev("k1", 10);
+        e1.ts = "2026-08-27T02:00:00Z".into();
+        record_event(&conn, "proj", &e1, Some(0.1), "subscription").unwrap();
+
+        // Insert event 2 at 01:00 (earlier)
+        let mut e2 = ev("k2", 20);
+        e2.ts = "2026-08-27T01:00:00Z".into();
+        record_event(&conn, "proj", &e2, Some(0.2), "subscription").unwrap();
+
+        // Insert event 3 at 03:00 (later)
+        let mut e3 = ev("k3", 30);
+        e3.ts = "2026-08-27T03:00:00Z".into();
+        record_event(&conn, "proj", &e3, Some(0.3), "subscription").unwrap();
+
+        // Verify session has min(started_at) and max(ended_at)
+        let (started, ended): (String, String) = conn
+            .query_row("SELECT started_at, ended_at FROM sessions WHERE session_id='s1'", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+
+        assert_eq!(started, "2026-08-27 01:00:00");
+        assert_eq!(ended, "2026-08-27 03:00:00");
+    }
+
+    #[test]
+    fn billing_mode_first_write_wins() {
+        let conn = open_memory().unwrap();
+
+        // Event 1: session "s1" with billing "subscription"
+        record_event(&conn, "proj", &ev("k1", 10), Some(0.1), "subscription").unwrap();
+
+        // Event 2: same session "s1" with billing "api"
+        record_event(&conn, "proj", &ev("k2", 20), Some(0.2), "api").unwrap();
+
+        // Verify billing_mode is still "subscription" (first write wins)
+        let billing: String = conn
+            .query_row("SELECT billing_mode FROM sessions WHERE session_id='s1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(billing, "subscription");
+    }
 }
