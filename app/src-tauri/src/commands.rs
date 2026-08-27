@@ -81,11 +81,21 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
     let rows: Vec<Value> = ws
         .iter()
         .map(|w| {
-            let lookback = if w.kind == "session" { 90 } else { 1440 };
-            let eta = limits::eta_hours(&conn, &w.key, w.utilization, lookback);
+            let (eta_h, eta_days) = if w.kind == "session" {
+                (limits::eta_hours(&conn, &w.key, w.utilization, 90), None)
+            } else {
+                // 周窗口：典型工作日续航；不可用时回退斜率法
+                let days = limits::weekly_days_left(
+                    &conn, w.utilization, w.resets_at.as_deref(), w.scope_label.as_deref());
+                let fallback = if days.is_none() {
+                    limits::eta_hours(&conn, &w.key, w.utilization, 1440)
+                } else { None };
+                (fallback, days)
+            };
             json!({
                 "key": w.key, "kind": w.kind, "scope": w.scope_label,
-                "utilization": w.utilization, "resets_at": w.resets_at, "eta_h": eta,
+                "utilization": w.utilization, "resets_at": w.resets_at,
+                "eta_h": eta_h, "eta_days": eta_days,
             })
         })
         .collect();

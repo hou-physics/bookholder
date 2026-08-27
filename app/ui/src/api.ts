@@ -40,7 +40,7 @@ export interface RecentSessionRow {
 }
 export interface LimitWindow {
   key: string; kind: string; scope: string | null;
-  utilization: number; resets_at: string | null; eta_h: number | null;
+  utilization: number; resets_at: string | null; eta_h: number | null; eta_days: number | null;
 }
 export interface FeePeriod { from: string; usd: number }
 export interface SubComparison {

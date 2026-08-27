@@ -54,6 +54,7 @@ const D: Record<string, [string, string, string]> = {
   "f.winWeekPrefix": ["周·", "Wk · ", "Wo · "],
   "f.allProjects": ["全部项目", "All projects", "Alle Projekte"],
   "f.est": ["est", "est", "ca."],
+  "f.workDays": [" 工作日", " wd", " AT"],
   "f.reset": ["重置", "resets", "Reset"],
   "f.exhaust": ["耗尽", "empty", "leer"],
   "f.limitErr": ["用量接口不可用（钥匙串未授权？）", "usage API unavailable (keychain denied?)", "Usage-API nicht verfügbar (Schlüsselbund?)"],

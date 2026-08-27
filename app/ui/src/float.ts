@@ -100,7 +100,7 @@ async function refreshLimits(): Promise<void> {
       row.innerHTML = `<span class="limit-label">${limitLabel(w)}</span>
         <div class="batt"><div class="batt-fill${cls}" style="width:${remaining}%"></div><span class="batt-txt">${Math.round(remaining)}%</span></div>
         <span class="limit-reset">${reset != null ? `↻${fmtDur(reset)}` : ""}</span>
-        <span class="limit-est">${t("f.est")} ${w.eta_h != null ? fmtDur(w.eta_h) : "—"}</span>`;
+        <span class="limit-est">${t("f.est")} ${w.eta_days != null ? `${w.eta_days.toFixed(1)}${t("f.workDays")}` : w.eta_h != null ? fmtDur(w.eta_h) : "—"}</span>`;
       box.appendChild(row);
     }
   } catch {

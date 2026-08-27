@@ -29,7 +29,7 @@ export const page: Page = {
           const cls = pct >= 95 ? " crit" : pct >= 80 ? " hot" : "";
           const reset = w.resets_at ? new Date(w.resets_at) : null;
           const resetTxt = reset ? ` · ${i18nt("f.reset")} ${reset.toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "";
-          const etaTxt = w.eta_h != null ? ` · ${i18nt("f.est")} ${w.eta_h < 48 ? Math.round(w.eta_h) + "h" : (w.eta_h / 24).toFixed(1) + "d"}` : "";
+          const etaTxt = w.eta_days != null ? ` · ${i18nt("f.est")} ${w.eta_days.toFixed(1)}${i18nt("f.workDays")}` : w.eta_h != null ? ` · ${i18nt("f.est")} ${w.eta_h < 48 ? Math.round(w.eta_h) + "h" : (w.eta_h / 24).toFixed(1) + "d"}` : "";
           return `<div class="limit-row" style="margin-bottom:6px"><span class="limit-label" style="width:70px">${label(w)}</span>
             <div class="limit-track"><div class="limit-fill${cls}" style="width:${pct}%"></div></div>
             <span class="limit-txt dim" style="min-width:190px">${Math.round(pct)}%${resetTxt}${etaTxt}</span></div>`;

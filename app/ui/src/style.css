@@ -71,7 +71,7 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .f-arrow:hover { background: var(--btn); color: var(--text); }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
 #f-limits { display: flex; flex-direction: column; gap: 7px; }
-.limit-row { display: grid; grid-template-columns: 52px 70px 1fr 74px; align-items: center; gap: 8px; }
+.limit-row { display: grid; grid-template-columns: 52px 70px 1fr 78px; align-items: center; gap: 8px; }
 .limit-label { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .batt { position: relative; width: 58px; height: 15px; border: 1.5px solid var(--dim); border-radius: 4.5px; }
 .batt::after { content: ""; position: absolute; right: -5px; top: 3.5px; width: 3px; height: 6px; border-radius: 0 1.5px 1.5px 0; background: var(--dim); }
@@ -79,8 +79,8 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .batt-fill.hot { background: var(--warn); }
 .batt-fill.crit { background: #c4554a; }
 .batt-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: var(--text); }
-.limit-reset { text-align: right; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.limit-est { text-align: right; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.limit-reset { text-align: left; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.limit-est { text-align: left; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* 总览页仍用长条样式 */
 .limit-track { height: 6px; border-radius: 3px; background: var(--btn); overflow: hidden; }
 .limit-fill { height: 100%; width: 0%; border-radius: 4px; background: var(--accent); }

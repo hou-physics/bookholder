@@ -194,6 +194,65 @@ pub fn eta_hours(conn: &Connection, kind: &str, current: f64, lookback_mins: i64
     Some((100.0 - current) / slope)
 }
 
+/// 周窗口的人性化续航：换算成"还能用多少个典型工作日"。
+///
+/// 配额绝对量未知，用成本代理外推：本周窗口内已消耗成本 C 对应利用率 U%，
+/// 则整周配额 ≈ C×100/U，剩余预算 ≈ 配额×(100−U)/100。
+/// 典型工作日 = 过去 14 个完整日中活跃日（有任何消耗）的日成本中位数（≥3 天才启用）。
+/// `model_like`：weekly_scoped 传模型名子串（如 "fable"），只统计该模型的成本。
+pub fn weekly_days_left(
+    conn: &Connection,
+    utilization: f64,
+    resets_at: Option<&str>,
+    model_like: Option<&str>,
+) -> Option<f64> {
+    if !(3.0..100.0).contains(&utilization) {
+        return None; // 样本太少或已打满
+    }
+    // 窗口起点 = 重置时刻 - 7 天
+    let reset = chrono::DateTime::parse_from_rfc3339(resets_at?).ok()?;
+    let window_start = (reset.with_timezone(&chrono::Utc) - chrono::Duration::days(7))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let like = model_like.map(|m| format!("%{}%", m.to_lowercase()));
+    let c_window: f64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM usage_events
+             WHERE ts >= ?1 AND (?2 IS NULL OR lower(model) LIKE ?2)",
+            params![window_start, like],
+            |r| r.get(0),
+        )
+        .unwrap_or(0.0);
+    if c_window <= 0.0 {
+        return None;
+    }
+    let quota = c_window * 100.0 / utilization;
+    let remaining_budget = quota * (100.0 - utilization) / 100.0;
+    // 过去 14 个完整日的活跃日成本中位数
+    let mut daily: Vec<f64> = conn
+        .prepare(
+            "SELECT SUM(cost_usd) FROM usage_events
+             WHERE date(ts,'localtime') >= date('now','localtime','-14 days')
+               AND date(ts,'localtime') < date('now','localtime')
+               AND (?1 IS NULL OR lower(model) LIKE ?1)
+             GROUP BY date(ts,'localtime') HAVING SUM(cost_usd) > 0",
+        )
+        .ok()?
+        .query_map(params![like], |r| r.get::<_, f64>(0))
+        .ok()?
+        .flatten()
+        .collect();
+    if daily.len() < 3 {
+        return None;
+    }
+    daily.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median = daily[daily.len() / 2];
+    if median <= 0.0 {
+        return None;
+    }
+    Some(remaining_budget / median)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,6 +321,35 @@ mod tests {
         assert!(eta_hours(&conn, "five_hour", 5.0, 60).is_none());
         // 无采样 kind → None
         assert!(eta_hours(&conn, "seven_day", 50.0, 60).is_none());
+    }
+
+    #[test]
+    fn weekly_days_left_from_cost_proxy() {
+        let conn = crate::store::open_memory().unwrap();
+        let mk = |key: &str, days_ago: i64, cost: f64, model: &str| {
+            let ts = (chrono::Utc::now() - chrono::Duration::days(days_ago) - chrono::Duration::hours(1))
+                .format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let e = crate::model::UsageEvent {
+                dedup_key: key.into(), ts, session_id: format!("s{days_ago}"), cwd: "/u/p".into(),
+                model: model.into(), is_sidechain: false, input_tokens: 1, output_tokens: 1,
+                thinking_tokens: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0,
+            };
+            crate::store::record_event(&conn, "-p", &e, Some(cost), "subscription").unwrap();
+        };
+        // 过去完整日：日成本 10/10/10/30（中位数 10）
+        mk("d1", 1, 10.0, "claude-fable-5");
+        mk("d2", 2, 10.0, "claude-fable-5");
+        mk("d3", 3, 10.0, "claude-fable-5");
+        mk("d4", 4, 30.0, "claude-fable-5");
+        // 本周窗口（重置在 2 天后 → 窗口始于 5 天前）内成本 = d1..d4 全部 60
+        let resets = (chrono::Utc::now() + chrono::Duration::days(2)).to_rfc3339();
+        // U=20% → 配额 = 60*100/20 = 300，剩余 = 240，中位日成本 10 → 24 天
+        let d = weekly_days_left(&conn, 20.0, Some(&resets), None).unwrap();
+        assert!((d - 24.0).abs() < 0.01, "{d}");
+        // 模型过滤：无匹配成本 → None
+        assert!(weekly_days_left(&conn, 20.0, Some(&resets), Some("opus")).is_none());
+        // 活跃日不足 → None（过滤出 0 天）
+        assert!(weekly_days_left(&conn, 1.0, Some(&resets), None).is_none()); // U<3
     }
 
     #[test]
