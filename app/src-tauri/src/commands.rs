@@ -105,11 +105,17 @@ pub fn refresh_prices(db: State<Db>) -> Result<String, String> {
     };
     let conn = db.0.lock().unwrap();
     let now = now_utc();
-    let n = pricing::upsert_prices(&conn, &prices, "litellm", &now).map_err(|e| e.to_string())?;
-    let re = pricing::reprice_null_costs(&conn).map_err(|e| e.to_string())?;
-    let _ = store::meta_set(&conn, "prices_last_fetch", &now);
-    let _ = store::meta_set(&conn, "prices_last_status", "ok");
-    Ok(format!("updated {n} models, repriced {re} events"))
+    let result = (|| -> Result<String, String> {
+        let n = pricing::upsert_prices(&conn, &prices, "litellm", &now).map_err(|e| e.to_string())?;
+        let re = pricing::reprice_null_costs(&conn).map_err(|e| e.to_string())?;
+        let _ = store::meta_set(&conn, "prices_last_fetch", &now);
+        let _ = store::meta_set(&conn, "prices_last_status", "ok");
+        Ok(format!("updated {n} models, repriced {re} events"))
+    })();
+    if let Err(e) = &result {
+        let _ = store::meta_set(&conn, "prices_last_status", &format!("error: {e}"));
+    }
+    result
 }
 
 #[tauri::command]
