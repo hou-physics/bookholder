@@ -69,6 +69,7 @@ export const api = {
   setUiPrefs: (theme: string | null, opacity: number | null) =>
     invoke<void>("set_ui_prefs", { theme, opacity }),
   openDashboard: () => invoke<void>("open_dashboard"),
+  quitApp: () => invoke<void>("quit_app"),
 };
 
 export function onUsageUpdated(cb: () => void): void {

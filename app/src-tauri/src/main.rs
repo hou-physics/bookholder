@@ -4,11 +4,7 @@ mod commands;
 
 use bookholder_core::{billing, ingest, pricing, store, watcher};
 use std::sync::Mutex;
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
-    Emitter, Manager,
-};
+use tauri::{tray::TrayIconBuilder, Emitter, Manager};
 
 fn main() {
     let conn = store::open_db(&store::default_db_path()).expect("open db");
@@ -38,53 +34,36 @@ fn main() {
             commands::subscription_comparison,
             commands::set_subscription_fees,
             commands::open_dashboard,
+            commands::quit_app,
         ])
         .setup(|app| {
-            // 托盘
-            let show = MenuItem::with_id(app, "show", "打开面板", true, None::<&str>)?;
-            let float = MenuItem::with_id(app, "float", "显示/隐藏悬浮窗", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &float, &quit])?;
+            // 托盘：macOS 上挂了菜单会吞掉全部点击事件，因此不挂菜单——
+            // 左键呼出悬浮窗，右键打开面板；退出在设置页。
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Bookholder（点按呼出悬浮窗，右键菜单）")
-                .menu(&menu)
-                .show_menu_on_left_click(false) // 左键留给呼出悬浮窗；菜单在右键
+                .tooltip("Bookholder：左键呼出悬浮窗，右键打开面板")
                 .on_tray_icon_event(|tray, event| {
                     use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
-                    // macOS 上 DoubleClick 事件送达不可靠——左键单击与双击都呼出悬浮窗
-                    let summon = matches!(
-                        event,
+                    let (label, is_click) = match event {
                         TrayIconEvent::Click {
                             button: MouseButton::Left,
                             button_state: MouseButtonState::Up,
                             ..
-                        } | TrayIconEvent::DoubleClick {
-                            button: MouseButton::Left,
+                        } => ("float", true),
+                        TrayIconEvent::Click {
+                            button: MouseButton::Right,
+                            button_state: MouseButtonState::Up,
                             ..
-                        }
-                    );
-                    if summon {
-                        if let Some(w) = tray.app_handle().get_webview_window("float") {
+                        } => ("main", true),
+                        TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => ("float", true),
+                        _ => ("", false),
+                    };
+                    if is_click {
+                        if let Some(w) = tray.app_handle().get_webview_window(label) {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
                     }
-                })
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
-                    }
-                    "float" => {
-                        if let Some(w) = app.get_webview_window("float") {
-                            if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { let _ = w.show(); }
-                        }
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
                 })
                 .build(app)?;
 

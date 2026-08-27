@@ -204,6 +204,11 @@ pub fn set_billing_override(db: State<Db>, mode: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 pub fn open_dashboard(app: AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();

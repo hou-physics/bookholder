@@ -74,6 +74,7 @@ export const page: Page = {
         <div class="panel">
           <h3>启动</h3>
           <label><input type="checkbox" id="chk-auto" ${auto ? "checked" : ""}/> 开机自动启动</label>
+          <button id="btn-quit" style="margin-left:16px">退出 Bookholder（停止采集）</button>
         </div>
         <p id="status" class="dim" style="margin-top:10px"></p>`;
 
@@ -127,6 +128,7 @@ export const page: Page = {
       rng.addEventListener("change", () => {
         void api.setUiPrefs(null, Number(rng.value) / 100).then(() => broadcastUiPrefsChanged());
       });
+      q("#btn-quit").addEventListener("click", () => void api.quitApp());
       (root.querySelector("#chk-auto") as HTMLInputElement).addEventListener("change", (e) => {
         const on = (e.target as HTMLInputElement).checked;
         void (on ? enable() : disable()).then(() => (status.textContent = on ? "已开启自启" : "已关闭自启"));
