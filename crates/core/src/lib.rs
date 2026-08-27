@@ -4,5 +4,6 @@ pub mod model;
 pub mod parse;
 pub mod pricing;
 pub mod queries;
+pub mod report;
 pub mod store;
 pub mod watcher;
