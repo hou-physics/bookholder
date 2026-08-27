@@ -17,6 +17,70 @@ pub struct UsageLimits {
     pub model_windows: Vec<(String, WindowUsage)>,
 }
 
+/// 接口 `limits` 数组的一行——Claude 客户端实际展示的三类进度条来源：
+/// session(5h) / weekly_all / weekly_scoped(带模型名)。
+#[derive(Debug, Clone, Serialize)]
+pub struct LimitWindow {
+    pub key: String,               // 采样键：session / weekly_all / weekly_<model>
+    pub kind: String,              // 原始 kind
+    pub scope_label: Option<String>, // weekly_scoped 的模型显示名（如 "Fable"）
+    pub utilization: f64,
+    pub resets_at: Option<String>,
+}
+
+/// 首选解析 `limits` 数组；缺失时回退 five_hour/seven_day 顶级字段。
+pub fn parse_limit_windows(json: &str) -> Result<Vec<LimitWindow>, String> {
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    let mut out = vec![];
+    if let Some(arr) = v.get("limits").and_then(|l| l.as_array()) {
+        for l in arr {
+            let Some(kind) = l.get("kind").and_then(|k| k.as_str()) else { continue };
+            let Some(pct) = l.get("percent").and_then(|p| p.as_f64()) else { continue };
+            let scope_label = l
+                .get("scope")
+                .and_then(|s| s.get("model"))
+                .and_then(|m| m.get("display_name"))
+                .and_then(|n| n.as_str())
+                .map(|s| s.to_string());
+            let key = match (kind, &scope_label) {
+                ("session", _) => "session".to_string(),
+                (k, Some(m)) => format!("{k}_{m}"),
+                (k, None) => k.to_string(),
+            };
+            out.push(LimitWindow {
+                key,
+                kind: kind.to_string(),
+                scope_label,
+                utilization: pct,
+                resets_at: l.get("resets_at").and_then(|r| r.as_str()).map(|s| s.to_string()),
+            });
+        }
+    }
+    if out.is_empty() {
+        // 回退旧字段
+        let u = parse_usage(json)?;
+        if let Some(w) = u.five_hour {
+            out.push(LimitWindow { key: "session".into(), kind: "session".into(), scope_label: None, utilization: w.utilization, resets_at: w.resets_at });
+        }
+        if let Some(w) = u.seven_day {
+            out.push(LimitWindow { key: "weekly_all".into(), kind: "weekly_all".into(), scope_label: None, utilization: w.utilization, resets_at: w.resets_at });
+        }
+    }
+    Ok(out)
+}
+
+pub fn record_window_samples(conn: &Connection, ws: &[LimitWindow], now_utc: &str) -> rusqlite::Result<()> {
+    ensure_table(conn)?;
+    for w in ws {
+        conn.execute(
+            "INSERT OR IGNORE INTO usage_samples (ts, kind, utilization) VALUES (?1, ?2, ?3)",
+            params![now_utc, w.key, w.utilization],
+        )?;
+    }
+    conn.execute("DELETE FROM usage_samples WHERE ts < datetime('now', '-14 days')", [])?;
+    Ok(())
+}
+
 pub const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 
 fn keychain_token() -> Result<String, String> {
@@ -150,6 +214,35 @@ mod tests {
         assert_eq!(u.seven_day.unwrap().utilization, 19.0);
         assert_eq!(u.model_windows.len(), 1);
         assert_eq!(u.model_windows[0].0, "seven_day_sonnet");
+    }
+
+    const LIMITS_FIXTURE: &str = r#"{
+      "five_hour": {"utilization": 14.0, "resets_at": "2026-08-27T22:49:59+00:00"},
+      "limits": [
+        {"kind": "session", "group": "session", "percent": 14, "resets_at": "2026-08-27T22:49:59+00:00", "scope": null},
+        {"kind": "weekly_all", "group": "weekly", "percent": 20, "resets_at": "2026-09-02T08:59:59+00:00", "scope": null},
+        {"kind": "weekly_scoped", "group": "weekly", "percent": 21, "resets_at": "2026-09-02T08:59:59+00:00",
+         "scope": {"model": {"id": null, "display_name": "Fable"}, "surface": null}}
+      ]
+    }"#;
+
+    #[test]
+    fn parses_limits_array_with_scoped_model() {
+        let ws = parse_limit_windows(LIMITS_FIXTURE).unwrap();
+        assert_eq!(ws.len(), 3);
+        assert_eq!(ws[0].key, "session");
+        assert_eq!(ws[1].key, "weekly_all");
+        assert_eq!(ws[2].key, "weekly_scoped_Fable");
+        assert_eq!(ws[2].scope_label.as_deref(), Some("Fable"));
+        assert_eq!(ws[2].utilization, 21.0);
+    }
+
+    #[test]
+    fn falls_back_to_top_level_fields() {
+        let ws = parse_limit_windows(FIXTURE).unwrap(); // FIXTURE 无 limits 数组
+        assert_eq!(ws.len(), 2);
+        assert_eq!(ws[0].key, "session");
+        assert_eq!(ws[0].utilization, 13.0);
     }
 
     #[test]

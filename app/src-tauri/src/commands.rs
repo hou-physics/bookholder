@@ -59,21 +59,26 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
             let now = now_utc();
             let _ = store::meta_set(&conn, "usage_cache_json", &b);
             let _ = store::meta_set(&conn, "usage_cache_ts", &now);
-            if let Ok(u) = limits::parse_usage(&b) {
-                let _ = limits::record_samples(&conn, &u, &now);
+            if let Ok(ws) = limits::parse_limit_windows(&b) {
+                let _ = limits::record_window_samples(&conn, &ws, &now);
             }
             b
         }
     };
-    let u = limits::parse_usage(&body)?;
+    let ws = limits::parse_limit_windows(&body)?;
     let conn = db.0.lock().unwrap();
-    let eta5 = u.five_hour.as_ref().and_then(|w| limits::eta_hours(&conn, "five_hour", w.utilization, 90));
-    let eta7 = u.seven_day.as_ref().and_then(|w| limits::eta_hours(&conn, "seven_day", w.utilization, 1440));
-    Ok(json!({
-        "five_hour": u.five_hour, "five_hour_eta_h": eta5,
-        "seven_day": u.seven_day, "seven_day_eta_h": eta7,
-        "model_windows": u.model_windows,
-    }))
+    let rows: Vec<Value> = ws
+        .iter()
+        .map(|w| {
+            let lookback = if w.kind == "session" { 90 } else { 1440 };
+            let eta = limits::eta_hours(&conn, &w.key, w.utilization, lookback);
+            json!({
+                "key": w.key, "kind": w.kind, "scope": w.scope_label,
+                "utilization": w.utilization, "resets_at": w.resets_at, "eta_h": eta,
+            })
+        })
+        .collect();
+    Ok(json!({ "windows": rows }))
 }
 
 #[tauri::command]

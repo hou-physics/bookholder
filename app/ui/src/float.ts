@@ -79,34 +79,34 @@ function cycle(step: number): void {
   void refresh();
 }
 
-function renderBar(barId: string, txtId: string, w: { utilization: number; resets_at: string | null } | null): void {
-  const bar = el(barId);
-  const txt = el(txtId);
-  if (!w) { bar.style.width = "0%"; txt.textContent = "—"; return; }
-  const u = Math.max(0, Math.min(100, w.utilization));
-  bar.style.width = `${u}%`;
-  bar.className = "limit-fill" + (u >= 95 ? " crit" : u >= 80 ? " hot" : "");
-  const reset = hoursUntil(w.resets_at);
-  txt.textContent = `${Math.round(u)}%${reset != null ? ` · ${t("f.reset")} ${fmtDur(reset)}` : ""}`;
+function limitLabel(w: { kind: string; scope: string | null }): string {
+  if (w.kind === "session") return t("f.win5h");
+  if (w.kind === "weekly_all") return t("f.winWeekAll");
+  return `${t("f.winWeekPrefix")}${w.scope ?? w.kind}`;
 }
 
 async function refreshLimits(): Promise<void> {
+  const box = el("f-limits");
   try {
     const u = await api.usageLimits();
-    renderBar("bar-5h", "txt-5h", u.five_hour);
-    renderBar("bar-7d", "txt-7d", u.seven_day);
-    // "续航"：斜率外推的耗尽时间，与重置时间取较小者才有意义（先耗尽才显示）
-    const capEta = (eta: number | null, w: { resets_at: string | null } | null): string => {
-      if (eta == null) return "—";
-      const reset = w ? hoursUntil(w.resets_at) : null;
-      return reset != null && reset < eta ? "—" : fmtDur(eta);
-    };
-    el("f-eta").textContent = t2("f.etaLine", {
-      a: capEta(u.five_hour_eta_h, u.five_hour),
-      b: capEta(u.seven_day_eta_h, u.seven_day),
-    });
+    box.innerHTML = "";
+    for (const w of u.windows) {
+      const pct = Math.max(0, Math.min(100, w.utilization));
+      const cls = pct >= 95 ? " crit" : pct >= 80 ? " hot" : "";
+      const reset = hoursUntil(w.resets_at);
+      // 电量式简洁文本：14% · ↻3h27 · est 2h10（est 仅在会先于重置耗尽时显示）
+      let txt = `${Math.round(pct)}%`;
+      if (reset != null) txt += ` · ↻${fmtDur(reset)}`;
+      if (w.eta_h != null && (reset == null || w.eta_h < reset)) txt += ` · ${t("f.est")} ${fmtDur(w.eta_h)}`;
+      const row = document.createElement("div");
+      row.className = "limit-row";
+      row.innerHTML = `<span class="limit-label">${limitLabel(w)}</span>
+        <div class="limit-track"><div class="limit-fill${cls}" style="width:${pct}%"></div></div>
+        <span class="limit-txt dim">${txt}</span>`;
+      box.appendChild(row);
+    }
   } catch {
-    el("f-eta").textContent = t("f.limitErr");
+    box.innerHTML = `<div class="f-eta dim">${t("f.limitErr")}</div>`;
   }
 }
 
@@ -123,14 +123,22 @@ async function refresh(): Promise<void> {
     d.billing_mode === "subscription" ? t("f.tipSub") : d.billing_mode === "api" ? t("f.tipApi") : "";
   el("f-today").textContent = fmtUsd(d.today_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
-  el("f-mini").textContent =
-    `${t("f.today")} ${fmtUsd(d.today_cost)} · ${fmtTok(d.today_tokens)} tok · ${fmtUsd(d.burn_rate)}/h`;
   renderSelection(d);
-  renderSparkInto(el("f-spark"), d.hourly);
   lastData = d;
+  void updateTaskSpark(d);   // 折叠区主图：当前任务（切换 ‹ › 跟随）
+  renderSparkInto(el("f-spark2"), d.hourly); // 展开区：全部项目
   renderTokens(d);
-  if (expanded) void updateDetail();
   void refreshLimits();
+}
+
+// 折叠区 24h 图显示当前选中任务；无任务时回退全部项目
+async function updateTaskSpark(d: FloatData): Promise<void> {
+  const task = currentTask();
+  if (task) {
+    renderSparkInto(el("f-spark"), await api.projectHourly(task.id));
+  } else {
+    renderSparkInto(el("f-spark"), d.hourly);
+  }
 }
 
 /* ---- 展开：当前任务的 24 小时明细 ---- */
@@ -157,20 +165,12 @@ function currentTask(): { id: number; name: string } | null {
   return null;
 }
 
-async function updateDetail(): Promise<void> {
-  const task = currentTask();
-  if (!task) return;
-  el("f-detail-name").textContent = task.name;
-  renderSparkInto(el("f-spark2"), await api.projectHourly(task.id));
-}
 
 async function setExpanded(on: boolean): Promise<void> {
   expanded = on;
   el("f-expanded").style.display = on ? "flex" : "none";
-  el("f-detail").style.display = on ? "flex" : "none";
   el("f-expand").textContent = on ? "⌃" : "⌄";
-  await win.setSize(new LogicalSize(304, on ? 396 : 154));
-  if (on) await updateDetail();
+  await win.setSize(new LogicalSize(304, on ? 356 : 236));
 }
 
 // Tauri 的 data-tauri-drag-region 只匹配 mousedown 的精确目标元素，

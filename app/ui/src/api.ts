@@ -38,6 +38,10 @@ export interface RecentSessionRow {
   id: number; session_id: string; project_name: string; started_at: string;
   ended_at: string; billing_mode: string; cost_usd: number; events: number; side_cost: number;
 }
+export interface LimitWindow {
+  key: string; kind: string; scope: string | null;
+  utilization: number; resets_at: string | null; eta_h: number | null;
+}
 export interface FeePeriod { from: string; usd: number }
 export interface SubComparison {
   fees: FeePeriod[]; window_start: string | null; window_days: number;
@@ -67,13 +71,7 @@ export const api = {
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
   usageLimits: () =>
-    invoke<{
-      five_hour: { utilization: number; resets_at: string | null } | null;
-      five_hour_eta_h: number | null;
-      seven_day: { utilization: number; resets_at: string | null } | null;
-      seven_day_eta_h: number | null;
-      model_windows: [string, { utilization: number; resets_at: string | null }][];
-    }>("usage_limits"),
+    invoke<{ windows: LimitWindow[] }>("usage_limits"),
   projectMetrics: (projectId: number) =>
     invoke<{ latest: { date: string; files: number; code_bytes: number; commits: number | null; top_ext: string }; days: number } | null>("project_metrics", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),

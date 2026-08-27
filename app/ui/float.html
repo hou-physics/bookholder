@@ -17,29 +17,18 @@
       <button id="f-expand" data-i18n-title="f.expandTip">⌄</button>
       <button id="f-hide" data-i18n-title="f.hideTip">✕</button>
     </div>
-    <div id="f-limits">
-      <div class="limit-row"><span class="limit-label" data-i18n="f.win5h">5 小时</span>
-        <div class="limit-track"><div id="bar-5h" class="limit-fill"></div></div>
-        <span id="txt-5h" class="limit-txt dim">—</span></div>
-      <div class="limit-row"><span class="limit-label" data-i18n="f.winWeek">本周</span>
-        <div class="limit-track"><div id="bar-7d" class="limit-fill"></div></div>
-        <span id="txt-7d" class="limit-txt dim">—</span></div>
-      <div id="f-eta" class="f-eta dim"></div>
+    <div id="f-limits"></div>
+    <div class="f-nums">
+      <div><label data-i18n="f.today">今日</label><b id="f-today">$0</b></div>
+      <div><label id="f-proj-label" data-i18n="f.taskTotal">该任务累计</label><b id="f-proj">$0</b></div>
+      <div><label data-i18n="f.burn">燃烧率/时</label><b id="f-burn">$0</b></div>
     </div>
-    <div id="f-mini" class="f-mini dim"></div>
+    <div id="f-spark" class="spark"></div>
+    <div class="spark-axis"><span data-i18n="f.h24">24 小时前</span><span data-i18n="f.perBar">每柱 = 1 小时</span><span data-i18n="f.now">现在</span></div>
     <div id="f-expanded">
-      <div class="f-nums">
-        <div><label data-i18n="f.today">今日</label><b id="f-today">$0</b></div>
-        <div><label id="f-proj-label" data-i18n="f.taskTotal">该任务累计</label><b id="f-proj">$0</b></div>
-        <div><label data-i18n="f.burn">燃烧率/时</label><b id="f-burn">$0</b></div>
-      </div>
-      <div id="f-spark" class="spark"></div>
+      <div class="dim f-detail-label" data-i18n="f.allProjects">全部项目</div>
+      <div id="f-spark2" class="spark"></div>
       <div id="f-tokens" class="f-tokens"></div>
-      <div id="f-detail" class="f-detail">
-        <div class="dim f-detail-label"><span data-i18n="f.currentTask">当前任务</span> · <span id="f-detail-name"></span></div>
-        <div id="f-spark2" class="spark"></div>
-      </div>
-      <div class="spark-axis"><span data-i18n="f.h24">24 小时前</span><span data-i18n="f.perBar">每柱 = 1 小时</span><span data-i18n="f.now">现在</span></div>
     </div>
   </div>
   <script type="module" src="/src/float.ts"></script>

@@ -49,11 +49,13 @@ const D: Record<string, [string, string, string]> = {
   "f.tipSub": ["订阅模式：所有金额为等值 API 成本（这些 token 若按 API 计费的价格），不是你的实际账单", "Subscription mode: amounts are API-equivalent cost (what these tokens would cost at API prices), not your actual bill", "Abo-Modus: Beträge sind API-Äquivalenzkosten (was diese Tokens zu API-Preisen kosten würden), nicht Ihre tatsächliche Rechnung"],
   "f.tipApi": ["API 模式：金额为实际计费成本", "API mode: amounts are actual billed cost", "API-Modus: Beträge sind tatsächliche Kosten"],
 
-  "f.win5h": ["5 小时", "5-hour", "5-Std"],
-  "f.winWeek": ["本周", "Week", "Woche"],
+  "f.win5h": ["5 小时", "Session", "Session"],
+  "f.winWeekAll": ["周·全部", "Wk · all", "Wo · alle"],
+  "f.winWeekPrefix": ["周·", "Wk · ", "Wo · "],
+  "f.allProjects": ["全部项目", "All projects", "Alle Projekte"],
+  "f.est": ["est", "est", "ca."],
   "f.reset": ["重置", "resets", "Reset"],
   "f.exhaust": ["耗尽", "empty", "leer"],
-  "f.etaLine": ["照当前速度：5h 额度约 {a} 后用完 · 周额度约 {b} 后用完", "At current pace: 5h quota empty in ~{a} · weekly in ~{b}", "Aktuelles Tempo: 5-Std-Kontingent leer in ~{a} · Woche in ~{b}"],
   "f.limitErr": ["用量接口不可用（钥匙串未授权？）", "usage API unavailable (keychain denied?)", "Usage-API nicht verfügbar (Schlüsselbund?)"],
   "o.limits": ["订阅限额", "Subscription limits", "Abo-Kontingente"],
 

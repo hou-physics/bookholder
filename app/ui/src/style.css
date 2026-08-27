@@ -45,7 +45,7 @@ body.theme-dark {
 body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--bg); color: var(--text); }
 /* 悬浮窗：背景/圆角放在 #float 上而不是 body ——
    body 背景会被浏览器传播到整个窗口画布（不带圆角），造成直角衬底 */
-.float-body { background: transparent; height: 100vh; }
+.float-body { background: transparent; height: 100vh; user-select: none; -webkit-user-select: none; cursor: default; }
 #float {
   display: flex; flex-direction: column; height: 100%; padding: 10px 12px; gap: 6px;
   background: var(--bg-translucent); border-radius: 18px; border: 1px solid var(--line);
@@ -70,14 +70,14 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .f-arrow { flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: var(--dim); font-size: 13px; }
 .f-arrow:hover { background: var(--btn); color: var(--text); }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
-#f-limits { display: flex; flex-direction: column; gap: 7px; }
+#f-limits { display: flex; flex-direction: column; gap: 6px; }
 .limit-row { display: flex; align-items: center; gap: 8px; }
-.limit-label { flex: none; width: 44px; font-size: 11px; color: var(--dim); }
-.limit-track { flex: 1; height: 8px; border-radius: 4px; background: var(--btn); overflow: hidden; }
+.limit-label { flex: none; width: 52px; font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.limit-track { flex: 1; height: 6px; border-radius: 3px; background: var(--btn); overflow: hidden; }
 .limit-fill { height: 100%; width: 0%; border-radius: 4px; background: var(--accent); transition: width 0.4s; }
 .limit-fill.hot { background: var(--warn); }
 .limit-fill.crit { background: #c4554a; }
-.limit-txt { flex: none; min-width: 92px; text-align: right; font-size: 10px; font-variant-numeric: tabular-nums; }
+.limit-txt { flex: none; min-width: 118px; text-align: right; font-size: 9.5px; font-variant-numeric: tabular-nums; }
 .f-eta { font-size: 10px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-mini { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #f-expanded { display: none; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
