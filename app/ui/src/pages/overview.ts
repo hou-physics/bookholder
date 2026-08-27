@@ -13,7 +13,7 @@ function card(label: string, t: Totals): string {
 
 export const page: Page = {
   render(root: HTMLElement): void {
-    root.innerHTML = `<div id="billing-note"></div><div id="sub-compare"></div><div id="cards" class="cards"></div>
+    root.innerHTML = `<div id="o-limits"></div><div id="billing-note"></div><div id="sub-compare"></div><div id="cards" class="cards"></div>
       <div class="chart-grid">
         <div class="panel"><h3>${i18nt("o.chartDaily")}</h3><div id="c-daily" class="chart"></div></div>
         <div class="panel"><h3>${i18nt("o.chartModels")}</h3><div id="c-models" class="chart"></div></div>
@@ -21,6 +21,24 @@ export const page: Page = {
       </div>`;
     void (async () => {
       const [o, s, sc] = await Promise.all([api.overview(), api.settings(), api.subscriptionComparison()]);
+      void api.usageLimits().then((u) => {
+        const bar = (w: { utilization: number; resets_at: string | null } | null, label: string): string => {
+          if (!w) return "";
+          const pct = Math.max(0, Math.min(100, w.utilization));
+          const cls = pct >= 95 ? " crit" : pct >= 80 ? " hot" : "";
+          const reset = w.resets_at ? new Date(w.resets_at) : null;
+          const resetTxt = reset ? ` · ${i18nt("f.reset")} ${reset.toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "";
+          return `<div class="limit-row" style="margin-bottom:6px"><span class="limit-label" style="width:56px">${label}</span>
+            <div class="limit-track"><div class="limit-fill${cls}" style="width:${pct}%"></div></div>
+            <span class="limit-txt dim" style="min-width:150px">${Math.round(pct)}%${resetTxt}</span></div>`;
+        };
+        const html = bar(u.five_hour, i18nt("f.win5h")) + bar(u.seven_day, i18nt("f.winWeek")) +
+          u.model_windows.map(([k, w]) => bar(w, k.replace("seven_day_", ""))).join("");
+        if (html) {
+          document.getElementById("o-limits")!.innerHTML =
+            `<div class="panel" style="margin-bottom:12px"><h3>${i18nt("o.limits")}</h3>${html}</div>`;
+        }
+      }).catch(() => {});
       if (sc.equiv_usd > 0) {
         const subEl = document.getElementById("sub-compare")!;
         if (sc.fees.length === 0) {

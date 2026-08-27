@@ -1,5 +1,6 @@
 pub mod billing;
 pub mod ingest;
+pub mod limits;
 pub mod metrics;
 pub mod model;
 pub mod parse;

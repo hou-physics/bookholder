@@ -1,4 +1,4 @@
-use bookholder_core::{billing, ingest, metrics, pricing, queries, report, store, subscription};
+use bookholder_core::{billing, ingest, limits, metrics, pricing, queries, report, store, subscription};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -38,6 +38,42 @@ pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>, 
         store::meta_set(&conn, "ui_float_opacity", &o.to_string()).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
+    // 60 秒节流：新鲜缓存直接返回，避免每次悬浮窗刷新都打接口
+    let cached: Option<String> = {
+        let conn = db.0.lock().unwrap();
+        let fresh = store::meta_get(&conn, "usage_cache_ts")
+            .and_then(|t| chrono::NaiveDateTime::parse_from_str(&t, "%Y-%m-%d %H:%M:%S").ok())
+            .map(|t| (chrono::Utc::now().naive_utc() - t).num_seconds() < 60)
+            .unwrap_or(false);
+        if fresh { store::meta_get(&conn, "usage_cache_json") } else { None }
+    };
+    let body = match cached {
+        Some(b) => b,
+        None => {
+            let b = limits::fetch_usage_json()?; // 网络在锁外
+            let conn = db.0.lock().unwrap();
+            let now = now_utc();
+            let _ = store::meta_set(&conn, "usage_cache_json", &b);
+            let _ = store::meta_set(&conn, "usage_cache_ts", &now);
+            if let Ok(u) = limits::parse_usage(&b) {
+                let _ = limits::record_samples(&conn, &u, &now);
+            }
+            b
+        }
+    };
+    let u = limits::parse_usage(&body)?;
+    let conn = db.0.lock().unwrap();
+    let eta5 = u.five_hour.as_ref().and_then(|w| limits::eta_hours(&conn, "five_hour", w.utilization, 90));
+    let eta7 = u.seven_day.as_ref().and_then(|w| limits::eta_hours(&conn, "seven_day", w.utilization, 1440));
+    Ok(json!({
+        "five_hour": u.five_hour, "five_hour_eta_h": eta5,
+        "seven_day": u.seven_day, "seven_day_eta_h": eta7,
+        "model_windows": u.model_windows,
+    }))
 }
 
 #[tauri::command]

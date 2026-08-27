@@ -1,6 +1,6 @@
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { api, applyTheme, fmtTok, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
-import { applyStaticI18n, resolveLang, setLang, t } from "./i18n";
+import { applyStaticI18n, resolveLang, setLang, t, t2 } from "./i18n";
 
 const win = getCurrentWindow();
 
@@ -14,6 +14,18 @@ async function applyPrefs(): Promise<void> {
 
 function el(id: string): HTMLElement {
   return document.getElementById(id)!;
+}
+
+function fmtDur(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)}m`;
+  if (hours < 48) { const h = Math.floor(hours); return `${h}h${String(Math.round((hours - h) * 60)).padStart(2, "0")}`; }
+  return `${(hours / 24).toFixed(1)}d`;
+}
+
+function hoursUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  return ms > 0 ? ms / 3.6e6 : null;
 }
 
 function shortModel(m: string): string {
@@ -67,6 +79,37 @@ function cycle(step: number): void {
   void refresh();
 }
 
+function renderBar(barId: string, txtId: string, w: { utilization: number; resets_at: string | null } | null): void {
+  const bar = el(barId);
+  const txt = el(txtId);
+  if (!w) { bar.style.width = "0%"; txt.textContent = "—"; return; }
+  const u = Math.max(0, Math.min(100, w.utilization));
+  bar.style.width = `${u}%`;
+  bar.className = "limit-fill" + (u >= 95 ? " crit" : u >= 80 ? " hot" : "");
+  const reset = hoursUntil(w.resets_at);
+  txt.textContent = `${Math.round(u)}%${reset != null ? ` · ${t("f.reset")} ${fmtDur(reset)}` : ""}`;
+}
+
+async function refreshLimits(): Promise<void> {
+  try {
+    const u = await api.usageLimits();
+    renderBar("bar-5h", "txt-5h", u.five_hour);
+    renderBar("bar-7d", "txt-7d", u.seven_day);
+    // "续航"：斜率外推的耗尽时间，与重置时间取较小者才有意义（先耗尽才显示）
+    const capEta = (eta: number | null, w: { resets_at: string | null } | null): string => {
+      if (eta == null) return "—";
+      const reset = w ? hoursUntil(w.resets_at) : null;
+      return reset != null && reset < eta ? "—" : fmtDur(eta);
+    };
+    el("f-eta").textContent = t2("f.etaLine", {
+      a: capEta(u.five_hour_eta_h, u.five_hour),
+      b: capEta(u.seven_day_eta_h, u.seven_day),
+    });
+  } catch {
+    el("f-eta").textContent = t("f.limitErr");
+  }
+}
+
 async function refresh(): Promise<void> {
   const d = await api.floatData();
   viewList = d.active;
@@ -80,11 +123,14 @@ async function refresh(): Promise<void> {
     d.billing_mode === "subscription" ? t("f.tipSub") : d.billing_mode === "api" ? t("f.tipApi") : "";
   el("f-today").textContent = fmtUsd(d.today_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
+  el("f-mini").textContent =
+    `${t("f.today")} ${fmtUsd(d.today_cost)} · ${fmtTok(d.today_tokens)} tok · ${fmtUsd(d.burn_rate)}/h`;
   renderSelection(d);
   renderSparkInto(el("f-spark"), d.hourly);
   lastData = d;
   renderTokens(d);
   if (expanded) void updateDetail();
+  void refreshLimits();
 }
 
 /* ---- 展开：当前任务的 24 小时明细 ---- */
@@ -94,11 +140,9 @@ let lastData: FloatData | null = null;
 // 展开态下的 token 口径行：今日 / 该任务 / 每小时燃烧（与上方美元数字同源同窗口）
 function renderTokens(d: FloatData): void {
   const row = el("f-tokens");
-  if (!expanded) { row.style.display = "none"; return; }
   const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
   const cur = viewList[idx];
   const taskTokens = cur ? cur.total_tokens : d.project_tokens;
-  row.style.display = "block";
   row.textContent =
     `${t("f.today")} ${fmtTok(d.today_tokens)} tok · ` +
     `${t("f.taskTotal")} ${fmtTok(taskTokens)} tok · ` +
@@ -122,10 +166,10 @@ async function updateDetail(): Promise<void> {
 
 async function setExpanded(on: boolean): Promise<void> {
   expanded = on;
+  el("f-expanded").style.display = on ? "flex" : "none";
   el("f-detail").style.display = on ? "flex" : "none";
   el("f-expand").textContent = on ? "⌃" : "⌄";
-  await win.setSize(new LogicalSize(304, on ? 268 : 178));
-  if (lastData) renderTokens(lastData);
+  await win.setSize(new LogicalSize(304, on ? 396 : 154));
   if (on) await updateDetail();
 }
 
