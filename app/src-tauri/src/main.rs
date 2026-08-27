@@ -47,11 +47,24 @@ fn main() {
             let menu = Menu::with_items(app, &[&show, &float, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Bookholder（双击呼出悬浮窗，右键菜单）")
+                .tooltip("Bookholder（点按呼出悬浮窗，右键菜单）")
                 .menu(&menu)
-                .show_menu_on_left_click(false) // 让双击可达；菜单改为右键
+                .show_menu_on_left_click(false) // 左键留给呼出悬浮窗；菜单在右键
                 .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                    use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
+                    // macOS 上 DoubleClick 事件送达不可靠——左键单击与双击都呼出悬浮窗
+                    let summon = matches!(
+                        event,
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } | TrayIconEvent::DoubleClick {
+                            button: MouseButton::Left,
+                            ..
+                        }
+                    );
+                    if summon {
                         if let Some(w) = tray.app_handle().get_webview_window("float") {
                             let _ = w.show();
                             let _ = w.set_focus();
