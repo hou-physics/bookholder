@@ -87,6 +87,16 @@ fn hourly_last24_impl(conn: &Connection, project_id: Option<i64>) -> Vec<HourRow
         .collect()
 }
 
+/// 最近 30 分钟 token 总量 ×2 —— 与 burn_rate_per_hour 同窗口的 token 口径。
+pub fn burn_tokens_per_hour(conn: &Connection) -> i64 {
+    let half: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(input_tokens + output_tokens + cache_read + cache_write_5m + cache_write_1h),0)
+         FROM usage_events WHERE ts >= datetime('now','-30 minutes')",
+        [], |r| r.get(0),
+    ).unwrap_or(0);
+    half * 2
+}
+
 pub fn burn_rate_per_hour(conn: &Connection) -> f64 {
     let half_hour: f64 = conn.query_row(
         "SELECT COALESCE(SUM(cost_usd),0) FROM usage_events WHERE ts >= datetime('now','-30 minutes')",
@@ -177,6 +187,7 @@ pub struct ActiveProjectRow {
     pub project_name: String,
     pub recent_cost: f64,
     pub total_cost: f64,
+    pub total_tokens: i64,
     pub last_model: String,
 }
 
@@ -185,6 +196,7 @@ pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
     let mut stmt = conn.prepare(
         "SELECT p.id, p.display_name, COALESCE(SUM(e.cost_usd),0),
                 (SELECT COALESCE(SUM(cost_usd),0) FROM usage_events WHERE project_id = p.id),
+                (SELECT COALESCE(SUM(input_tokens + output_tokens + cache_read + cache_write_5m + cache_write_1h),0) FROM usage_events WHERE project_id = p.id),
                 (SELECT model FROM usage_events WHERE project_id = p.id ORDER BY ts DESC LIMIT 1)
          FROM usage_events e JOIN projects p ON p.id = e.project_id
          WHERE e.ts >= datetime('now', ?1)
@@ -192,7 +204,7 @@ pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
     ).unwrap();
     stmt.query_map([format!("-{mins} minutes")], |r| Ok(ActiveProjectRow {
         project_id: r.get(0)?, project_name: r.get(1)?, recent_cost: r.get(2)?,
-        total_cost: r.get(3)?, last_model: r.get(4)?,
+        total_cost: r.get(3)?, total_tokens: r.get(4)?, last_model: r.get(5)?,
     })).map(|it| it.flatten().collect()).unwrap_or_default()
 }
 

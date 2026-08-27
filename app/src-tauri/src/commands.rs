@@ -82,16 +82,21 @@ pub fn float_data(db: State<Db>) -> Value {
     let (t0, t1) = queries::today_range();
     let today = queries::totals(&conn, Some(&t0), Some(&t1), None);
     let ctx = queries::current_context(&conn);
-    let project_cost = ctx.as_ref()
-        .map(|c| queries::totals(&conn, None, None, Some(c.project_id)).cost_usd)
-        .unwrap_or(0.0);
+    let proj_totals = ctx.as_ref().map(|c| queries::totals(&conn, None, None, Some(c.project_id)));
+    let project_cost = proj_totals.as_ref().map(|t| t.cost_usd).unwrap_or(0.0);
+    let project_tokens = proj_totals.as_ref()
+        .map(|t| t.input + t.output + t.cache_read + t.cache_write)
+        .unwrap_or(0);
     json!({
         "today_cost": today.cost_usd,
+        "today_tokens": today.input + today.output + today.cache_read + today.cache_write,
         "project_cost": project_cost,
+        "project_tokens": project_tokens,
         "project_id": ctx.as_ref().map(|c| c.project_id),
         "project_name": ctx.as_ref().map(|c| c.project_name.clone()).unwrap_or_else(|| "—".into()),
         "model": ctx.as_ref().map(|c| c.model.clone()).unwrap_or_default(),
         "burn_rate": queries::burn_rate_per_hour(&conn),
+        "burn_tokens": queries::burn_tokens_per_hour(&conn),
         "billing_mode": billing::effective_mode(&conn, &home()),
         "hourly": queries::hourly_last24(&conn),
         "active": queries::active_projects(&conn, 30),

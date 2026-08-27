@@ -70,6 +70,7 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .f-arrow { flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: var(--dim); font-size: 13px; }
 .f-arrow:hover { background: var(--btn); color: var(--text); }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
+.f-tokens { display: none; font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-detail { display: none; flex-direction: column; gap: 2px; flex: 1; min-height: 0; }
 .f-detail-label { font-size: 9px; line-height: 1; }
 .spark-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--dim); line-height: 1; }

@@ -23,11 +23,12 @@ export interface EventRow {
 }
 export interface ActiveProjectRow {
   project_id: number; project_name: string; recent_cost: number;
-  total_cost: number; last_model: string;
+  total_cost: number; total_tokens: number; last_model: string;
 }
 export interface FloatData {
-  today_cost: number; project_cost: number; project_id: number | null; project_name: string; model: string;
-  burn_rate: number; billing_mode: string; hourly: HourRow[]; active: ActiveProjectRow[];
+  today_cost: number; today_tokens: number;
+  project_cost: number; project_tokens: number; project_id: number | null; project_name: string; model: string;
+  burn_rate: number; burn_tokens: number; billing_mode: string; hourly: HourRow[]; active: ActiveProjectRow[];
 }
 export interface Overview {
   today: Totals; week: Totals; month: Totals; all: Totals;

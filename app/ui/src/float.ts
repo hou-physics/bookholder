@@ -1,5 +1,5 @@
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-import { api, applyTheme, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
+import { api, applyTheme, fmtTok, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
 import { applyStaticI18n, resolveLang, setLang, t } from "./i18n";
 
 const win = getCurrentWindow();
@@ -43,7 +43,7 @@ function renderSparkInto(spark: HTMLElement, hourly: FloatData["hourly"]): void 
 
 // 活跃任务切换：selectedId 记住用户选择；项目掉出活跃列表后回落到消耗最高者。
 let selectedId: number | null = null;
-let viewList: { project_id: number; project_name: string; recent_cost: number; total_cost: number; last_model: string }[] = [];
+let viewList: FloatData["active"] = [];
 
 function renderSelection(d: FloatData): void {
   const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
@@ -83,12 +83,27 @@ async function refresh(): Promise<void> {
   renderSelection(d);
   renderSparkInto(el("f-spark"), d.hourly);
   lastData = d;
+  renderTokens(d);
   if (expanded) void updateDetail();
 }
 
 /* ---- 展开：当前任务的 24 小时明细 ---- */
 let expanded = false;
 let lastData: FloatData | null = null;
+
+// 展开态下的 token 口径行：今日 / 该任务 / 每小时燃烧（与上方美元数字同源同窗口）
+function renderTokens(d: FloatData): void {
+  const row = el("f-tokens");
+  if (!expanded) { row.style.display = "none"; return; }
+  const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
+  const cur = viewList[idx];
+  const taskTokens = cur ? cur.total_tokens : d.project_tokens;
+  row.style.display = "block";
+  row.textContent =
+    `${t("f.today")} ${fmtTok(d.today_tokens)} tok · ` +
+    `${t("f.taskTotal")} ${fmtTok(taskTokens)} tok · ` +
+    `${fmtTok(d.burn_tokens)} tok/h`;
+}
 
 function currentTask(): { id: number; name: string } | null {
   const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
@@ -109,7 +124,8 @@ async function setExpanded(on: boolean): Promise<void> {
   expanded = on;
   el("f-detail").style.display = on ? "flex" : "none";
   el("f-expand").textContent = on ? "⌃" : "⌄";
-  await win.setSize(new LogicalSize(304, on ? 252 : 178));
+  await win.setSize(new LogicalSize(304, on ? 268 : 178));
+  if (lastData) renderTokens(lastData);
   if (on) await updateDetail();
 }
 
