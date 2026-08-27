@@ -65,6 +65,7 @@ pub fn ingest_file(conn: &Connection, path: &Path, slug: &str, billing: &str) ->
                         let _ = crate::store::set_offset(conn, &key, offset + line_start_pos);
                         let _ = crate::store::bump_counter(conn, "skip_lines", st.skipped as i64);
                         let _ = crate::store::bump_counter(conn, "bad_lines", st.bad as i64);
+                        let _ = crate::store::bump_counter(conn, "store_errors", 1);
                         return st;
                     }
                 }
