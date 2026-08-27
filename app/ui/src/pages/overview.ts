@@ -1,5 +1,5 @@
 import { api, fmtUsd, fmtTok, Totals } from "../api";
-import { mountChart, PALETTE } from "../charts";
+import { mountChart, palette } from "../charts";
 import type { Page } from "../main";
 
 function card(label: string, t: Totals): string {
@@ -63,7 +63,7 @@ export const page: Page = {
       mountChart(document.getElementById("c-models")!, {
         tooltip: { formatter: (p: { name: string; value: number }) => `${p.name}: ${fmtUsd(p.value)}` } as any,
         series: [{ type: "pie", radius: ["45%", "72%"],
-          label: { color: "#e8eaf0" },
+          label: { color: document.body.classList.contains("theme-dark") ? "#e8eaf0" : "#33291f" },
           data: o.models.map((m) => ({ name: m.model, value: +m.cost_usd.toFixed(4) })) }],
       });
 
@@ -72,8 +72,8 @@ export const page: Page = {
         xAxis: { type: "value", axisLabel: { formatter: (v: number) => `$${v}` } },
         yAxis: { type: "category", data: ["成本"] },
         series: [
-          { name: "主对话", type: "bar", stack: "s", data: [+o.main_cost.toFixed(4)], itemStyle: { color: PALETTE[0] } },
-          { name: "Subagent", type: "bar", stack: "s", data: [+o.side_cost.toFixed(4)], itemStyle: { color: PALETTE[1] } },
+          { name: "主对话", type: "bar", stack: "s", data: [+o.main_cost.toFixed(4)], itemStyle: { color: palette()[0] } },
+          { name: "Subagent", type: "bar", stack: "s", data: [+o.side_cost.toFixed(4)], itemStyle: { color: palette()[1] } },
         ],
         legend: { textStyle: { color: "#8b90a0" } },
       });

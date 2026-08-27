@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 
 export interface Totals {
   cost_usd: number; input: number; output: number; thinking: number;
@@ -45,6 +45,7 @@ export interface SubComparison {
   detected_tier: string | null;
 }
 export interface SettingsStatus {
+  theme: string; float_opacity: number;
   prices_last_fetch: string | null; prices_last_status: string | null; price_count: number;
   billing_mode: string; billing_override: string | null;
   skip_lines: string | null; bad_lines: string | null; db_path: string;
@@ -65,11 +66,26 @@ export const api = {
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
   setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
+  setUiPrefs: (theme: string | null, opacity: number | null) =>
+    invoke<void>("set_ui_prefs", { theme, opacity }),
   openDashboard: () => invoke<void>("open_dashboard"),
 };
 
 export function onUsageUpdated(cb: () => void): void {
   void listen("usage-updated", cb);
+}
+
+/* ---- UI 偏好（主题/透明度）：跨窗口同步 ---- */
+export function onUiPrefsChanged(cb: () => void): void {
+  void listen("ui-prefs-changed", cb);
+}
+
+export async function broadcastUiPrefsChanged(): Promise<void> {
+  await emit("ui-prefs-changed");
+}
+
+export function applyTheme(theme: string): void {
+  document.body.classList.toggle("theme-dark", theme === "dark");
 }
 
 export function fmtUsd(n: number): string {

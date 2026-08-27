@@ -16,6 +16,24 @@ fn now_utc() -> String {
 }
 
 #[tauri::command]
+pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    if let Some(t) = theme {
+        if t != "light" && t != "dark" {
+            return Err(format!("unknown theme {t}"));
+        }
+        store::meta_set(&conn, "ui_theme", &t).map_err(|e| e.to_string())?;
+    }
+    if let Some(o) = opacity {
+        if !(0.3..=1.0).contains(&o) {
+            return Err(format!("opacity out of range: {o}"));
+        }
+        store::meta_set(&conn, "ui_float_opacity", &o.to_string()).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn sessions_recent(db: State<Db>, limit: i64) -> Value {
     let conn = db.0.lock().unwrap();
     serde_json::to_value(queries::recent_sessions(&conn, limit)).unwrap_or(Value::Null)
@@ -111,6 +129,9 @@ pub fn settings_status(db: State<Db>) -> Value {
         "skip_lines": store::meta_get(&conn, "skip_lines"),
         "bad_lines": store::meta_get(&conn, "bad_lines"),
         "db_path": store::default_db_path().to_string_lossy(),
+        "theme": store::meta_get(&conn, "ui_theme").unwrap_or_else(|| "light".into()),
+        "float_opacity": store::meta_get(&conn, "ui_float_opacity")
+            .and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.95),
     })
 }
 

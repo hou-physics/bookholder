@@ -1,7 +1,13 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, fmtUsd, onUsageUpdated, FloatData } from "./api";
+import { api, applyTheme, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
 
 const win = getCurrentWindow();
+
+async function applyPrefs(): Promise<void> {
+  const s = await api.settings();
+  applyTheme(s.theme);
+  document.body.style.opacity = String(s.float_opacity); // 整窗透明度（窗口本体 transparent）
+}
 
 function el(id: string): HTMLElement {
   return document.getElementById(id)!;
@@ -92,5 +98,7 @@ el("f-hide").addEventListener("click", () => void win.hide());
 el("f-prev").addEventListener("click", () => cycle(-1));
 el("f-next").addEventListener("click", () => cycle(1));
 onUsageUpdated(() => void refresh());
+onUiPrefsChanged(() => void applyPrefs());
+void applyPrefs();
 void refresh();
 setInterval(() => void refresh(), 60_000); // 兜底：burn rate 随时间衰减也要更新

@@ -1,4 +1,4 @@
-import { onUsageUpdated } from "./api";
+import { api, applyTheme, onUiPrefsChanged, onUsageUpdated } from "./api";
 import { page as overview } from "./pages/overview";
 import { page as projects } from "./pages/projects";
 import { page as sessions } from "./pages/sessions";
@@ -28,4 +28,11 @@ onUsageUpdated(() => {
   // 但设置页含表单交互状态，流式 ingest 事件不应打断用户操作
   if ((location.hash || "#overview") !== "#settings") route();
 });
+onUiPrefsChanged(() => {
+  void api.settings().then((s) => {
+    applyTheme(s.theme);
+    route(); // 图表颜色随主题重建
+  });
+});
+void api.settings().then((s) => applyTheme(s.theme));
 route();

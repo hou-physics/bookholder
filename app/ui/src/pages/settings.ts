@@ -1,4 +1,4 @@
-import { api } from "../api";
+import { api, broadcastUiPrefsChanged } from "../api";
 import { save } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import type { Page } from "../main";
@@ -58,6 +58,19 @@ export const page: Page = {
           </p>
           <p class="dim">换过档位就加多段（如：历史 $100，升级日起 $200），成本按天折算跨段累加。</p>
         </div>
+        <div class="panel" style="margin-bottom:10px">
+          <h3>外观</h3>
+          <label>主题
+            <select id="sel-theme">
+              <option value="light" ${s.theme === "light" ? "selected" : ""}>浅色（橙调）</option>
+              <option value="dark" ${s.theme === "dark" ? "selected" : ""}>深色</option>
+            </select>
+          </label>
+          <label style="margin-left:16px">悬浮窗透明度
+            <input type="range" id="rng-opacity" min="30" max="100" step="5" value="${Math.round(s.float_opacity * 100)}" />
+            <span id="opacity-val">${Math.round(s.float_opacity * 100)}%</span>
+          </label>
+        </div>
         <div class="panel">
           <h3>启动</h3>
           <label><input type="checkbox" id="chk-auto" ${auto ? "checked" : ""}/> 开机自动启动</label>
@@ -102,6 +115,18 @@ export const page: Page = {
           void saveFees(sc.fees.filter((_, idx) => idx !== i));
         }),
       );
+      (root.querySelector("#sel-theme") as HTMLSelectElement).addEventListener("change", (e) => {
+        void api
+          .setUiPrefs((e.target as HTMLSelectElement).value, null)
+          .then(() => broadcastUiPrefsChanged());
+      });
+      const rng = root.querySelector("#rng-opacity") as HTMLInputElement;
+      rng.addEventListener("input", () => {
+        (root.querySelector("#opacity-val") as HTMLElement).textContent = `${rng.value}%`;
+      });
+      rng.addEventListener("change", () => {
+        void api.setUiPrefs(null, Number(rng.value) / 100).then(() => broadcastUiPrefsChanged());
+      });
       (root.querySelector("#chk-auto") as HTMLInputElement).addEventListener("change", (e) => {
         const on = (e.target as HTMLInputElement).checked;
         void (on ? enable() : disable()).then(() => (status.textContent = on ? "已开启自启" : "已关闭自启"));

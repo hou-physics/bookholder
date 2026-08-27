@@ -33,6 +33,7 @@ fn main() {
             commands::run_backfill,
             commands::export_report,
             commands::set_billing_override,
+            commands::set_ui_prefs,
             commands::sessions_recent,
             commands::subscription_comparison,
             commands::set_subscription_fees,

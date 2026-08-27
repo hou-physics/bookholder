@@ -29,7 +29,7 @@ function mountProjectCharts(daily: Awaited<ReturnType<typeof api.projectOverview
   mountChart(document.getElementById("p-models")!, {
     tooltip: { formatter: (it: { name: string; value: number }) => `${it.name}: ${fmtUsd(it.value)}` } as any,
     series: [{ type: "pie", radius: ["45%", "72%"],
-      label: { color: "#e8eaf0" },
+      label: { color: document.body.classList.contains("theme-dark") ? "#e8eaf0" : "#33291f" },
       data: models.map((m) => ({ name: m.model, value: +m.cost_usd.toFixed(4) })) }],
   });
 }
