@@ -51,19 +51,30 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
             .unwrap_or(false);
         if fresh { store::meta_get(&conn, "usage_cache_json") } else { None }
     };
+    let mut stale = false;
     let body = match cached {
         Some(b) => b,
-        None => {
-            let b = limits::fetch_usage_json()?; // 网络在锁外
-            let conn = db.0.lock().unwrap();
-            let now = now_utc();
-            let _ = store::meta_set(&conn, "usage_cache_json", &b);
-            let _ = store::meta_set(&conn, "usage_cache_ts", &now);
-            if let Ok(ws) = limits::parse_limit_windows(&b) {
-                let _ = limits::record_window_samples(&conn, &ws, &now);
+        None => match limits::fetch_usage_json() { // 网络在锁外
+            Ok(b) => {
+                let conn = db.0.lock().unwrap();
+                let now = now_utc();
+                let _ = store::meta_set(&conn, "usage_cache_json", &b);
+                let _ = store::meta_set(&conn, "usage_cache_ts", &now);
+                if let Ok(ws) = limits::parse_limit_windows(&b) {
+                    let _ = limits::record_window_samples(&conn, &ws, &now);
+                }
+                b
             }
-            b
-        }
+            Err(e) => {
+                // 钥匙串重签名后未授权等场景：退回上次成功的缓存（标记 stale），
+                // 完全没有缓存才把错误抛给前端。
+                let conn = db.0.lock().unwrap();
+                match store::meta_get(&conn, "usage_cache_json") {
+                    Some(b) => { stale = true; b }
+                    None => return Err(e),
+                }
+            }
+        },
     };
     let ws = limits::parse_limit_windows(&body)?;
     let conn = db.0.lock().unwrap();
@@ -78,7 +89,7 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
             })
         })
         .collect();
-    Ok(json!({ "windows": rows }))
+    Ok(json!({ "windows": rows, "stale": stale }))
 }
 
 #[tauri::command]

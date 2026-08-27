@@ -70,14 +70,23 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .f-arrow { flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: var(--dim); font-size: 13px; }
 .f-arrow:hover { background: var(--btn); color: var(--text); }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
-#f-limits { display: flex; flex-direction: column; gap: 6px; }
-.limit-row { display: flex; align-items: center; gap: 8px; }
-.limit-label { flex: none; width: 52px; font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.limit-track { flex: 1; height: 6px; border-radius: 3px; background: var(--btn); overflow: hidden; }
-.limit-fill { height: 100%; width: 0%; border-radius: 4px; background: var(--accent); transition: width 0.4s; }
+#f-limits { display: flex; flex-direction: column; gap: 7px; }
+.limit-row { display: grid; grid-template-columns: 52px 70px 1fr 74px; align-items: center; gap: 8px; }
+.limit-label { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.batt { position: relative; width: 58px; height: 15px; border: 1.5px solid var(--dim); border-radius: 4.5px; }
+.batt::after { content: ""; position: absolute; right: -5px; top: 3.5px; width: 3px; height: 6px; border-radius: 0 1.5px 1.5px 0; background: var(--dim); }
+.batt-fill { position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; border-radius: 2.5px; background: var(--good); transition: width 0.4s; }
+.batt-fill.hot { background: var(--warn); }
+.batt-fill.crit { background: #c4554a; }
+.batt-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: var(--text); }
+.limit-reset { text-align: right; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.limit-est { text-align: right; font-size: 9.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 总览页仍用长条样式 */
+.limit-track { height: 6px; border-radius: 3px; background: var(--btn); overflow: hidden; }
+.limit-fill { height: 100%; width: 0%; border-radius: 4px; background: var(--accent); }
 .limit-fill.hot { background: var(--warn); }
 .limit-fill.crit { background: #c4554a; }
-.limit-txt { flex: none; width: 128px; text-align: right; font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.limit-txt { text-align: right; font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
 .f-eta { font-size: 10px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-mini { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #f-expanded { display: none; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }

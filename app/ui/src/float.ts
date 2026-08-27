@@ -90,19 +90,17 @@ async function refreshLimits(): Promise<void> {
   try {
     const u = await api.usageLimits();
     box.innerHTML = "";
+    box.style.opacity = u.stale ? "0.55" : "1";
     for (const w of u.windows) {
-      const pct = Math.max(0, Math.min(100, w.utilization));
-      const cls = pct >= 95 ? " crit" : pct >= 80 ? " hot" : "";
+      const remaining = Math.max(0, Math.min(100, 100 - w.utilization));
+      const cls = remaining <= 10 ? " crit" : remaining <= 25 ? " hot" : "";
       const reset = hoursUntil(w.resets_at);
-      // 电量式简洁文本：14% · ↻3h27 · est 2h10（est 仅在会先于重置耗尽时显示）
-      let txt = `${Math.round(pct)}%`;
-      if (reset != null) txt += ` · ↻${fmtDur(reset)}`;
-      if (w.eta_h != null && (reset == null || w.eta_h < reset)) txt += ` · ${t("f.est")} ${fmtDur(w.eta_h)}`;
       const row = document.createElement("div");
       row.className = "limit-row";
       row.innerHTML = `<span class="limit-label">${limitLabel(w)}</span>
-        <div class="limit-track"><div class="limit-fill${cls}" style="width:${pct}%"></div></div>
-        <span class="limit-txt dim">${txt}</span>`;
+        <div class="batt"><div class="batt-fill${cls}" style="width:${remaining}%"></div><span class="batt-txt">${Math.round(remaining)}%</span></div>
+        <span class="limit-reset">${reset != null ? `↻${fmtDur(reset)}` : ""}</span>
+        <span class="limit-est">${t("f.est")} ${w.eta_h != null ? fmtDur(w.eta_h) : "—"}</span>`;
       box.appendChild(row);
     }
   } catch {

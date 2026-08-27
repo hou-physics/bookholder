@@ -71,7 +71,7 @@ export const api = {
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
   usageLimits: () =>
-    invoke<{ windows: LimitWindow[] }>("usage_limits"),
+    invoke<{ windows: LimitWindow[]; stale: boolean }>("usage_limits"),
   projectMetrics: (projectId: number) =>
     invoke<{ latest: { date: string; files: number; code_bytes: number; commits: number | null; top_ext: string }; days: number } | null>("project_metrics", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
