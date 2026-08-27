@@ -5,8 +5,20 @@
   <title>Bookholder Float</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
-<body class="float-body" data-tauri-drag-region>
-  <div id="float">…</div>
+<body class="float-body">
+  <div id="float" data-tauri-drag-region>
+    <div class="f-top" data-tauri-drag-region>
+      <span id="f-project">—</span>
+      <span id="f-badge" class="badge">…</span>
+      <span id="f-model" class="dim"></span>
+    </div>
+    <div class="f-nums" data-tauri-drag-region>
+      <div><label>今日</label><b id="f-today">$0</b></div>
+      <div><label>本项目</label><b id="f-proj">$0</b></div>
+      <div><label>燃烧率/时</label><b id="f-burn">$0</b></div>
+    </div>
+    <div id="f-spark" class="spark" data-tauri-drag-region></div>
+  </div>
   <script type="module" src="/src/float.ts"></script>
 </body>
 </html>

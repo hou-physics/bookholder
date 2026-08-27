@@ -1,3 +1,18 @@
 * { margin: 0; box-sizing: border-box; }
 body { font-family: -apple-system, "PingFang SC", sans-serif; background: #14161c; color: #e8eaf0; }
 .float-body { background: rgba(20, 22, 28, 0.92); border-radius: 12px; overflow: hidden; height: 100vh; }
+
+#float { display: flex; flex-direction: column; height: 100%; padding: 10px 12px; gap: 6px; }
+.f-top { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+#f-project { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.dim { color: #8b90a0; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #2a2d38; }
+.badge-subscription { background: #1d3a2f; color: #6fd49a; }
+.badge-api { background: #3a2d1d; color: #d4b16f; }
+.f-nums { display: flex; justify-content: space-between; }
+.f-nums label { display: block; font-size: 10px; color: #8b90a0; }
+.f-nums b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
+.spark-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.spark-main { background: #4f6df5; border-radius: 1px; }
+.spark-side { background: #b46ff5; border-radius: 1px; }
