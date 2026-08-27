@@ -4,6 +4,8 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: #14161
 
 #float { display: flex; flex-direction: column; height: 100%; padding: 10px 12px; gap: 6px; }
 .f-top { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+#f-hide { margin-left: auto; flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: #8b90a0; font-size: 13px; }
+#f-hide:hover { background: #2a2d38; color: #e8eaf0; }
 #f-project { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .dim { color: #8b90a0; }
 .badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #2a2d38; }
@@ -29,6 +31,8 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: #14161
 .card b { font-size: 20px; font-variant-numeric: tabular-nums; }
 .card .dim { font-size: 10px; }
 .warn { color: #d4b16f; font-size: 10px; }
+.billing-note { background: #1d2a3a; color: #9fc2e8; border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+.billing-note b { color: #cfe4f8; }
 .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .panel { background: #1a1d26; border-radius: 10px; padding: 12px; }
 .panel h3 { font-size: 12px; color: #8b90a0; margin-bottom: 6px; }

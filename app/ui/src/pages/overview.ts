@@ -10,14 +10,21 @@ function card(label: string, t: Totals): string {
 
 export const page: Page = {
   render(root: HTMLElement): void {
-    root.innerHTML = `<div id="cards" class="cards"></div>
+    root.innerHTML = `<div id="billing-note"></div><div id="cards" class="cards"></div>
       <div class="chart-grid">
         <div class="panel"><h3>近 30 天成本（按模型）</h3><div id="c-daily" class="chart"></div></div>
         <div class="panel"><h3>模型占比</h3><div id="c-models" class="chart"></div></div>
         <div class="panel"><h3>主对话 vs Subagent</h3><div id="c-side" class="chart chart-slim"></div></div>
       </div>`;
     void (async () => {
-      const o = await api.overview();
+      const [o, s] = await Promise.all([api.overview(), api.settings()]);
+      if (s.billing_mode === "subscription") {
+        document.getElementById("billing-note")!.innerHTML =
+          `<p class="billing-note">💡 订阅模式：以下所有金额是<b>等值 API 成本</b>——这些 token 若按 API 价格计费需要花多少钱。你的实际支出是订阅费本身；这个数字越高，说明订阅越划算。</p>`;
+      } else if (s.billing_mode === "api") {
+        document.getElementById("billing-note")!.innerHTML =
+          `<p class="billing-note">API 模式：以下金额为实际计费成本。</p>`;
+      }
       document.getElementById("cards")!.innerHTML =
         card("今日", o.today) + card("近 7 天", o.week) + card("近 30 天", o.month) + card("全部", o.all);
 
