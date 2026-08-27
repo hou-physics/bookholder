@@ -125,10 +125,22 @@ async function refresh(): Promise<void> {
   el("f-burn").textContent = fmtUsd(d.burn_rate);
   renderSelection(d);
   lastData = d;
+  renderAxis(d.hourly);
   void updateTaskSpark(d);   // 折叠区主图：当前任务（切换 ‹ › 跟随）
   renderSparkInto(el("f-spark2"), d.hourly); // 展开区：全部项目
   renderTokens(d);
   void refreshLimits();
+}
+
+// 时间轴：5 个真实时刻刻度（每 6 小时一个），取代文字说明
+function renderAxis(hourly: FloatData["hourly"]): void {
+  const ax = el("f-axis");
+  ax.innerHTML = "";
+  for (const i of [0, 6, 12, 18, 23]) {
+    const span = document.createElement("span");
+    span.textContent = hourly[i] ? hourly[i].hour.slice(11, 16) : "";
+    ax.appendChild(span);
+  }
 }
 
 // 折叠区 24h 图显示当前选中任务；无任务时回退全部项目
