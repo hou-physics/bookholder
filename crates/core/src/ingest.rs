@@ -1,7 +1,7 @@
 use crate::parse::{parse_line, ParseOutcome};
 use rusqlite::Connection;
 use serde::Serialize;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Seek, SeekFrom};
 use std::path::Path;
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -9,6 +9,7 @@ pub struct IngestStats {
     pub added: u64,
     pub skipped: u64,
     pub bad: u64,
+    pub store_errors: u64,
 }
 
 impl IngestStats {
@@ -16,6 +17,7 @@ impl IngestStats {
         self.added += o.added;
         self.skipped += o.skipped;
         self.bad += o.bad;
+        self.store_errors += o.store_errors;
     }
 }
 
@@ -30,21 +32,25 @@ pub fn ingest_file(conn: &Connection, path: &Path, slug: &str, billing: &str) ->
     }
     if len == offset { return st; }
     if f.seek(SeekFrom::Start(offset as u64)).is_err() { return st; }
-    let mut buf = String::new();
-    if f.read_to_string(&mut buf).is_err() {
-        // 非 UTF-8 边界等：按字节读再有损转换
-        let mut bytes = vec![];
-        let _ = f.seek(SeekFrom::Start(offset as u64));
-        if f.read_to_end(&mut bytes).is_err() { return st; }
-        buf = String::from_utf8_lossy(&bytes).into_owned();
-    }
+
+    // All offset math on raw bytes
+    let mut bytes = vec![];
+    if std::io::Read::read_to_end(&mut f, &mut bytes).is_err() { return st; }
+
     // 只消费完整行
-    let consumed_end = match buf.rfind('\n') {
+    let consumed_end = match bytes.iter().rposition(|&b| b == b'\n') {
         Some(i) => i + 1,
         None => { return st; } // 整段都是半行
     };
-    for line in buf[..consumed_end].lines() {
-        let line = line.trim();
+
+    // Iterate lines with byte position tracking
+    let mut pos = 0i64;
+    for line_bytes in bytes[..consumed_end].split(|&b| b == b'\n') {
+        let line_start_pos = pos;
+        pos += line_bytes.len() as i64 + 1; // +1 for the newline separator
+
+        let line_str = String::from_utf8_lossy(line_bytes);
+        let line = line_str.trim();
         if line.is_empty() { continue; }
         match parse_line(line) {
             ParseOutcome::Event(e) => {
@@ -53,13 +59,21 @@ pub fn ingest_file(conn: &Connection, path: &Path, slug: &str, billing: &str) ->
                 match crate::store::record_event(conn, slug, &e, cost, billing) {
                     Ok(true) => st.added += 1,
                     Ok(false) => {} // 去重
-                    Err(_) => st.bad += 1,
+                    Err(_) => {
+                        // Stop and rewind to retry this line later
+                        st.store_errors += 1;
+                        let _ = crate::store::set_offset(conn, &key, offset + line_start_pos);
+                        let _ = crate::store::bump_counter(conn, "skip_lines", st.skipped as i64);
+                        let _ = crate::store::bump_counter(conn, "bad_lines", st.bad as i64);
+                        return st;
+                    }
                 }
             }
             ParseOutcome::Skipped => st.skipped += 1,
             ParseOutcome::Bad => st.bad += 1,
         }
     }
+
     let _ = crate::store::set_offset(conn, &key, offset + consumed_end as i64);
     let _ = crate::store::bump_counter(conn, "skip_lines", st.skipped as i64);
     let _ = crate::store::bump_counter(conn, "bad_lines", st.bad as i64);
@@ -149,5 +163,30 @@ mod tests {
         fs::write(&file, format!("{L1}\n")).unwrap(); // 缩水
         let st = scan_all(&conn, dir.path(), "api");
         assert_eq!(st.added, 0); // 重读但 dedup 挡住
+    }
+
+    #[test]
+    fn non_utf8_bytes_preserves_byte_offset() {
+        let (dir, file) = setup();
+        // Write valid line + invalid UTF-8 bytes + newline
+        let mut buf = format!("{L1}\n").into_bytes();
+        buf.extend_from_slice(b"\xFF\xFEgarbage\n");
+        std::fs::write(&file, &buf).unwrap();
+
+        let conn = crate::store::open_memory().unwrap();
+        let st = scan_all(&conn, dir.path(), "api");
+
+        // Should process L1 (added=1), skip empty lines, bad=1 for the garbage line
+        assert_eq!(st.added, 1);
+        assert_eq!(st.bad, 1);
+
+        // Offset must equal file's true byte length (not corrupted by UTF-8 lossy conversion)
+        let file_len = std::fs::metadata(&file).unwrap().len() as i64;
+        let stored_offset: i64 = conn.query_row(
+            "SELECT offset FROM file_offsets WHERE path = ?1",
+            [file.to_string_lossy().to_string()],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(stored_offset, file_len);
     }
 }
