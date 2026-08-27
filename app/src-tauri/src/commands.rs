@@ -94,9 +94,21 @@ pub fn settings_status(db: State<Db>) -> Value {
 
 #[tauri::command]
 pub fn refresh_prices(db: State<Db>) -> Result<String, String> {
+    // 网络请求在拿锁之前完成，避免长时间占用 Mutex<Connection> 阻塞其它命令。
+    let prices = match pricing::fetch_remote_prices() {
+        Ok(p) => p,
+        Err(e) => {
+            let conn = db.0.lock().unwrap();
+            let _ = store::meta_set(&conn, "prices_last_status", &format!("error: {e}"));
+            return Err(e);
+        }
+    };
     let conn = db.0.lock().unwrap();
-    let n = pricing::refresh_from_network(&conn, &now_utc())?;
+    let now = now_utc();
+    let n = pricing::upsert_prices(&conn, &prices, "litellm", &now).map_err(|e| e.to_string())?;
     let re = pricing::reprice_null_costs(&conn).map_err(|e| e.to_string())?;
+    let _ = store::meta_set(&conn, "prices_last_fetch", &now);
+    let _ = store::meta_set(&conn, "prices_last_status", "ok");
     Ok(format!("updated {n} models, repriced {re} events"))
 }
 

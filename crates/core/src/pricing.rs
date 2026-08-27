@@ -146,12 +146,36 @@ pub fn seed_snapshot(conn: &Connection) -> rusqlite::Result<usize> {
     upsert_prices(conn, &parse_litellm(SNAPSHOT_JSON), "snapshot", "1970-01-01 00:00:00")
 }
 
-pub fn refresh_from_network(conn: &Connection, now: &str) -> Result<usize, String> {
-    let body = ureq::get(PRICES_URL).call().map_err(|e| e.to_string())?
+/// 拉取远端价格表并解析，不带 DB 连接、不写任何数据。调用方决定何时/是否持锁写库，
+/// 让网络 IO 完全发生在锁之外。显式设置 15s 超时（覆盖 connect+read），避免网络异常时
+/// 无限期占用调用线程。
+pub fn fetch_remote_prices() -> Result<Vec<ModelPrice>, String> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(15))
+        .build();
+    let body = agent.get(PRICES_URL).call().map_err(|e| e.to_string())?
         .into_string().map_err(|e| e.to_string())?;
     let prices = parse_litellm(&body);
     if prices.is_empty() { return Err("parsed 0 claude models".into()); }
-    let n = upsert_prices(conn, &prices, "litellm", now).map_err(|e| e.to_string())?;
+    Ok(prices)
+}
+
+pub fn refresh_from_network(conn: &Connection, now: &str) -> Result<usize, String> {
+    let prices = match fetch_remote_prices() {
+        Ok(p) => p,
+        Err(e) => {
+            let _ = crate::store::meta_set(conn, "prices_last_status", &format!("error: {e}"));
+            return Err(e);
+        }
+    };
+    let n = match upsert_prices(conn, &prices, "litellm", now) {
+        Ok(n) => n,
+        Err(e) => {
+            let e = e.to_string();
+            let _ = crate::store::meta_set(conn, "prices_last_status", &format!("error: {e}"));
+            return Err(e);
+        }
+    };
     let _ = crate::store::meta_set(conn, "prices_last_fetch", now);
     let _ = crate::store::meta_set(conn, "prices_last_status", "ok");
     Ok(n)
