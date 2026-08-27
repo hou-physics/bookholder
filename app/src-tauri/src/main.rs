@@ -49,7 +49,8 @@ fn main() {
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_float, &show, &quit])?;
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+                .icon_as_template(true) // 模板图标：跟随菜单栏深浅自动着色
                 .tooltip("Bookholder")
                 .menu(&menu)
                 .on_menu_event(|app, event| {

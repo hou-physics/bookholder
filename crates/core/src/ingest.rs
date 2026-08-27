@@ -88,11 +88,17 @@ pub fn scan_all(conn: &Connection, projects_dir: &Path, billing: &str) -> Ingest
         let p = entry.path();
         if !p.is_dir() { continue; }
         let slug = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        let Ok(files) = std::fs::read_dir(&p) else { continue };
-        for f in files.flatten() {
-            let fp = f.path();
-            if fp.extension().map(|e| e == "jsonl").unwrap_or(false) {
-                total.merge(&ingest_file(conn, &fp, &slug, billing));
+        // 递归：subagent 转录存于 <项目>/<会话id>/subagents/agent-*.jsonl 等嵌套目录
+        let mut stack = vec![p];
+        while let Some(dir) = stack.pop() {
+            let Ok(files) = std::fs::read_dir(&dir) else { continue };
+            for f in files.flatten() {
+                let fp = f.path();
+                if fp.is_dir() {
+                    stack.push(fp);
+                } else if fp.extension().map(|e| e == "jsonl").unwrap_or(false) {
+                    total.merge(&ingest_file(conn, &fp, &slug, billing));
+                }
             }
         }
     }
@@ -153,6 +159,23 @@ mod tests {
         let mut f = OpenOptions::new().append(true).open(&file).unwrap();
         write!(f, "{}\n", &L3[40..]).unwrap();
         assert_eq!(scan_all(&conn, dir.path(), "api").added, 1);
+    }
+
+    #[test]
+    fn scan_recurses_into_subagent_dirs() {
+        let (dir, _file) = setup();
+        let nested = dir.path().join("-Users-me-alpha/sess-uuid/subagents");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("agent-x.jsonl"), format!("{L3}\n")).unwrap();
+        let conn = crate::store::open_memory().unwrap();
+        let st = scan_all(&conn, dir.path(), "api");
+        assert_eq!(st.added, 1);
+        let side: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM usage_events WHERE is_sidechain=1", [], |r| r.get(0)).unwrap();
+        assert_eq!(side, 1);
+        // slug 仍归属顶层项目目录
+        let slug: String = conn.query_row("SELECT slug FROM projects", [], |r| r.get(0)).unwrap();
+        assert_eq!(slug, "-Users-me-alpha");
     }
 
     #[test]
