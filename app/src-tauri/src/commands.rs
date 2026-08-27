@@ -34,6 +34,12 @@ pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>) 
 }
 
 #[tauri::command]
+pub fn project_hourly(db: State<Db>, project_id: i64) -> Value {
+    let conn = db.0.lock().unwrap();
+    serde_json::to_value(queries::hourly_last24_project(&conn, project_id)).unwrap_or(Value::Null)
+}
+
+#[tauri::command]
 pub fn sessions_recent(db: State<Db>, limit: i64) -> Value {
     let conn = db.0.lock().unwrap();
     serde_json::to_value(queries::recent_sessions(&conn, limit)).unwrap_or(Value::Null)
@@ -66,6 +72,7 @@ pub fn float_data(db: State<Db>) -> Value {
     json!({
         "today_cost": today.cost_usd,
         "project_cost": project_cost,
+        "project_id": ctx.as_ref().map(|c| c.project_id),
         "project_name": ctx.as_ref().map(|c| c.project_name.clone()).unwrap_or_else(|| "—".into()),
         "model": ctx.as_ref().map(|c| c.model.clone()).unwrap_or_default(),
         "burn_rate": queries::burn_rate_per_hour(&conn),

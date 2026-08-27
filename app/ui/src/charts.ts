@@ -1,7 +1,7 @@
 import * as echarts from "echarts";
 
 const DARK_PALETTE = ["#4f6df5", "#b46ff5", "#6fd49a", "#d4b16f", "#f56d6d", "#6fc4d4"];
-const LIGHT_PALETTE = ["#e8722a", "#c9541f", "#2f9e63", "#b97f1d", "#d4453b", "#2a8fb8"];
+const LIGHT_PALETTE = ["#5f8d89", "#a58a68", "#7d94b5", "#b5847d", "#8aa66f", "#9a86ad"];
 
 function isDark(): boolean {
   return document.body.classList.contains("theme-dark");

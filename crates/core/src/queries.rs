@@ -54,14 +54,24 @@ pub fn project_daily(conn: &Connection, project_id: i64, days: i64) -> Vec<Daily
 pub struct HourRow { pub hour: String, pub main_cost: f64, pub side_cost: f64 }
 
 pub fn hourly_last24(conn: &Connection) -> Vec<HourRow> {
+    hourly_last24_impl(conn, None)
+}
+
+/// 单项目版：悬浮窗"展开当前任务明细"用。
+pub fn hourly_last24_project(conn: &Connection, project_id: i64) -> Vec<HourRow> {
+    hourly_last24_impl(conn, Some(project_id))
+}
+
+fn hourly_last24_impl(conn: &Connection, project_id: Option<i64>) -> Vec<HourRow> {
     let mut stmt = conn.prepare(
         "SELECT strftime('%Y-%m-%d %H:00', ts, 'localtime') h,
                 COALESCE(SUM(CASE WHEN is_sidechain=0 THEN cost_usd ELSE 0 END),0),
                 COALESCE(SUM(CASE WHEN is_sidechain=1 THEN cost_usd ELSE 0 END),0)
-         FROM usage_events WHERE ts >= datetime('now', '-24 hours')
+         FROM usage_events
+         WHERE ts >= datetime('now', '-24 hours') AND (?1 IS NULL OR project_id = ?1)
          GROUP BY h ORDER BY h",
     ).unwrap();
-    let rows: Vec<HourRow> = stmt.query_map([], |r| Ok(HourRow { hour: r.get(0)?, main_cost: r.get(1)?, side_cost: r.get(2)? }))
+    let rows: Vec<HourRow> = stmt.query_map(params![project_id], |r| Ok(HourRow { hour: r.get(0)?, main_cost: r.get(1)?, side_cost: r.get(2)? }))
         .map(|it| it.flatten().collect()).unwrap_or_default();
 
     // 零填充到固定 24 小时，缺失小时补 0，保证悬浮窗 sparkline 长度恒定
@@ -406,5 +416,25 @@ mod tests {
         let rows = hourly_last24(&conn);
         assert_eq!(rows.len(), 24);
         assert!(rows.iter().all(|r| r.main_cost == 0.0 && r.side_cost == 0.0));
+    }
+
+    #[test]
+    fn hourly_project_filters_and_fills_24() {
+        let conn = crate::store::open_memory().unwrap();
+        let ts = (chrono::Utc::now() - chrono::Duration::minutes(10))
+            .format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let mk = |key: &str, cwd: &str, cost: f64| crate::model::UsageEvent {
+            dedup_key: key.into(), ts: ts.clone(), session_id: format!("s-{key}"), cwd: cwd.into(),
+            model: "claude-fable-5".into(), is_sidechain: false,
+            input_tokens: 1, output_tokens: 1, thinking_tokens: 0,
+            cache_write_5m: 0, cache_write_1h: 0, cache_read: 0,
+        };
+        crate::store::record_event(&conn, "-a", &mk("k1", "/u/a", 5.0), Some(5.0), "subscription").unwrap();
+        crate::store::record_event(&conn, "-b", &mk("k2", "/u/b", 3.0), Some(3.0), "subscription").unwrap();
+        let pid_a: i64 = conn.query_row("SELECT id FROM projects WHERE slug='-a'", [], |r| r.get(0)).unwrap();
+        let rows = hourly_last24_project(&conn, pid_a);
+        assert_eq!(rows.len(), 24);
+        let total: f64 = rows.iter().map(|r| r.main_cost + r.side_cost).sum();
+        assert!((total - 5.0).abs() < 1e-9); // 只含项目 a，不含 b 的 3.0
     }
 }

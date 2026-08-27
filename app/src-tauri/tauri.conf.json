@@ -15,6 +15,7 @@
       {
         "label": "float",
         "url": "float.html",
+        "acceptFirstMouse": true,
         "width": 304,
         "height": 178,
         "alwaysOnTop": true,

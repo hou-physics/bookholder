@@ -26,7 +26,7 @@ export interface ActiveProjectRow {
   total_cost: number; last_model: string;
 }
 export interface FloatData {
-  today_cost: number; project_cost: number; project_name: string; model: string;
+  today_cost: number; project_cost: number; project_id: number | null; project_name: string; model: string;
   burn_rate: number; billing_mode: string; hourly: HourRow[]; active: ActiveProjectRow[];
 }
 export interface Overview {
@@ -64,6 +64,7 @@ export const api = {
   exportReport: (kind: string, dest: string) => invoke<void>("export_report", { kind, dest }),
   setBillingOverride: (mode: string) => invoke<void>("set_billing_override", { mode }),
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
+  projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
   setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
   setUiPrefs: (theme: string | null, opacity: number | null) =>

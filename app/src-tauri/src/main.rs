@@ -4,7 +4,11 @@ mod commands;
 
 use bookholder_core::{billing, ingest, pricing, store, watcher};
 use std::sync::Mutex;
-use tauri::{tray::TrayIconBuilder, Emitter, Manager};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    Emitter, Manager,
+};
 
 fn main() {
     let conn = store::open_db(&store::default_db_path()).expect("open db");
@@ -30,6 +34,7 @@ fn main() {
             commands::export_report,
             commands::set_billing_override,
             commands::set_ui_prefs,
+            commands::project_hourly,
             commands::sessions_recent,
             commands::subscription_comparison,
             commands::set_subscription_fees,
@@ -37,35 +42,37 @@ fn main() {
             commands::quit_app,
         ])
         .setup(|app| {
-            // 托盘：macOS 上挂了菜单会吞掉全部点击事件，因此不挂菜单——
-            // 左键呼出悬浮窗，右键打开面板；退出在设置页。
+            // 托盘：实测（CGEvent 注入 + 事件日志）证明此版本在 macOS 上
+            // 无菜单托盘不发任何点击事件——挂菜单、左键出菜单是唯一可靠路径。
+            let show_float = MenuItem::with_id(app, "float", "显示悬浮窗", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "打开面板", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_float, &show, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Bookholder：左键呼出悬浮窗，右键打开面板")
-                .on_tray_icon_event(|tray, event| {
-                    use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
-                    let (label, is_click) = match event {
-                        TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } => ("float", true),
-                        TrayIconEvent::Click {
-                            button: MouseButton::Right,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } => ("main", true),
-                        TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => ("float", true),
-                        _ => ("", false),
-                    };
-                    if is_click {
-                        if let Some(w) = tray.app_handle().get_webview_window(label) {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+                .tooltip("Bookholder")
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    tray_log(&format!("menu: {}", event.id.as_ref()));
+                    match event.id.as_ref() {
+                        "float" => {
+                            if let Some(w) = app.get_webview_window("float") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
                         }
+                        "show" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
                     }
                 })
                 .build(app)?;
+            tray_log("tray built ok (menu mode)");
 
             // 后台采集线程：初扫 + 监视 + 每日价格刷新
             let handle = app.handle().clone();
@@ -114,6 +121,16 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running bookholder");
+}
+
+/// 托盘诊断日志（问题解决后保留也无妨：极低频、只记录托盘交互）
+fn tray_log(msg: &str) {
+    use std::io::Write;
+    if let Some(dir) = store::default_db_path().parent().map(|p| p.to_path_buf()) {
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("tray.log")) {
+            let _ = writeln!(f, "{} {msg}", chrono::Local::now().format("%H:%M:%S%.3f"));
+        }
+    }
 }
 
 fn maybe_refresh_prices(conn: &rusqlite::Connection) {

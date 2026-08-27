@@ -14,7 +14,8 @@
       <button id="f-next" class="f-arrow" title="下一个活跃任务">›</button>
       <span id="f-badge" class="badge">…</span>
       <span id="f-model" class="dim"></span>
-      <button id="f-hide" title="隐藏悬浮窗（双击菜单栏图标可恢复，不是退出）">✕</button>
+      <button id="f-expand" title="展开/收起当前任务 24 小时明细">⌄</button>
+      <button id="f-hide" title="隐藏悬浮窗（菜单栏图标可恢复，不是退出）">✕</button>
     </div>
     <div class="f-nums">
       <div><label>今日</label><b id="f-today">$0</b></div>
@@ -22,6 +23,10 @@
       <div><label>燃烧率/时</label><b id="f-burn">$0</b></div>
     </div>
     <div id="f-spark" class="spark"></div>
+    <div id="f-detail" class="f-detail">
+      <div class="dim f-detail-label">当前任务 · <span id="f-detail-name"></span></div>
+      <div id="f-spark2" class="spark"></div>
+    </div>
     <div class="spark-axis"><span>24 小时前</span><span>每柱 = 1 小时</span><span>现在</span></div>
   </div>
   <script type="module" src="/src/float.ts"></script>

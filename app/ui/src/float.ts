@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { api, applyTheme, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
 
 const win = getCurrentWindow();
@@ -17,8 +17,7 @@ function shortModel(m: string): string {
   return m.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 }
 
-function renderSpark(hourly: FloatData["hourly"]): void {
-  const spark = el("f-spark");
+function renderSparkInto(spark: HTMLElement, hourly: FloatData["hourly"]): void {
   spark.innerHTML = "";
   const max = Math.max(...hourly.map((h) => h.main_cost + h.side_cost), 1e-9);
   for (const h of hourly) {
@@ -30,6 +29,9 @@ function renderSpark(hourly: FloatData["hourly"]): void {
     const main = document.createElement("div");
     main.className = "spark-main";
     main.style.height = `${((h.main_cost / max) * 100).toFixed(1)}%`;
+    // 柱顶倒角：给最上面那段圆角
+    const top = h.side_cost > 0 ? side : main;
+    if (h.main_cost + h.side_cost > 0) top.style.borderRadius = "2.5px 2.5px 0 0";
     col.append(side, main);
     col.title = `${h.hour}  主 ${fmtUsd(h.main_cost)} / 子 ${fmtUsd(h.side_cost)}`;
     spark.appendChild(col);
@@ -80,7 +82,36 @@ async function refresh(): Promise<void> {
   el("f-today").textContent = fmtUsd(d.today_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
   renderSelection(d);
-  renderSpark(d.hourly);
+  renderSparkInto(el("f-spark"), d.hourly);
+  lastData = d;
+  if (expanded) void updateDetail();
+}
+
+/* ---- 展开：当前任务的 24 小时明细 ---- */
+let expanded = false;
+let lastData: FloatData | null = null;
+
+function currentTask(): { id: number; name: string } | null {
+  const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
+  const cur = viewList[idx];
+  if (cur) return { id: cur.project_id, name: cur.project_name };
+  if (lastData?.project_id != null) return { id: lastData.project_id, name: lastData.project_name };
+  return null;
+}
+
+async function updateDetail(): Promise<void> {
+  const task = currentTask();
+  if (!task) return;
+  el("f-detail-name").textContent = task.name;
+  renderSparkInto(el("f-spark2"), await api.projectHourly(task.id));
+}
+
+async function setExpanded(on: boolean): Promise<void> {
+  expanded = on;
+  el("f-detail").style.display = on ? "flex" : "none";
+  el("f-expand").textContent = on ? "⌃" : "⌄";
+  await win.setSize(new LogicalSize(304, on ? 252 : 178));
+  if (on) await updateDetail();
 }
 
 // Tauri 的 data-tauri-drag-region 只匹配 mousedown 的精确目标元素，
@@ -95,6 +126,7 @@ document.body.addEventListener("mousedown", (e) => {
   }
 });
 el("f-hide").addEventListener("click", () => void win.hide());
+el("f-expand").addEventListener("click", () => void setExpanded(!expanded));
 el("f-prev").addEventListener("click", () => cycle(-1));
 el("f-next").addEventListener("click", () => cycle(1));
 onUsageUpdated(() => void refresh());
