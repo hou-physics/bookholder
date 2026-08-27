@@ -198,7 +198,8 @@ pub fn eta_hours(conn: &Connection, kind: &str, current: f64, lookback_mins: i64
 ///
 /// 配额绝对量未知，用成本代理外推：本周窗口内已消耗成本 C 对应利用率 U%，
 /// 则整周配额 ≈ C×100/U，剩余预算 ≈ 配额×(100−U)/100。
-/// 典型工作日 = 过去 14 个完整日中活跃日（有任何消耗）的日成本中位数（≥3 天才启用）。
+/// 典型工作日 = max(14 日活跃日中位数, 最近 3 活跃日均值, 今日已消耗)：
+/// 中位数给出常态基准，后两项让爆发期立即收敛到"照现在的速度"（≥3 活跃日才启用）。
 /// `model_like`：weekly_scoped 传模型名子串（如 "fable"），只统计该模型的成本。
 pub fn weekly_days_left(
     conn: &Connection,
@@ -247,10 +248,33 @@ pub fn weekly_days_left(
     }
     daily.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let median = daily[daily.len() / 2];
-    if median <= 0.0 {
+    // 最近 3 个活跃日均值：行为变重时比中位数反应快
+    let last3: f64 = conn
+        .prepare(
+            "SELECT AVG(c) FROM (
+               SELECT SUM(cost_usd) c FROM usage_events
+               WHERE date(ts,'localtime') < date('now','localtime')
+                 AND (?1 IS NULL OR lower(model) LIKE ?1)
+               GROUP BY date(ts,'localtime') HAVING SUM(cost_usd) > 0
+               ORDER BY date(ts,'localtime') DESC LIMIT 3)",
+        )
+        .and_then(|mut st| st.query_row(params![like], |r| r.get(0)))
+        .unwrap_or(0.0);
+    // 今天已消耗：爆发日当天立即把口径拉到"照现在的速度"
+    let today: f64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM usage_events
+             WHERE date(ts,'localtime') = date('now','localtime')
+               AND (?1 IS NULL OR lower(model) LIKE ?1)",
+            params![like],
+            |r| r.get(0),
+        )
+        .unwrap_or(0.0);
+    let typical_day = median.max(last3).max(today);
+    if typical_day <= 0.0 {
         return None;
     }
-    Some(remaining_budget / median)
+    Some(remaining_budget / typical_day)
 }
 
 #[cfg(test)]
@@ -336,16 +360,22 @@ mod tests {
             };
             crate::store::record_event(&conn, "-p", &e, Some(cost), "subscription").unwrap();
         };
-        // 过去完整日：日成本 10/10/10/30（中位数 10）
-        mk("d1", 1, 10.0, "claude-fable-5");
+        // 过去完整日（新→旧）：30/10/10/10 —— 中位数 10，最近 3 日均值 (30+10+10)/3≈16.67
+        mk("d1", 1, 30.0, "claude-fable-5");
         mk("d2", 2, 10.0, "claude-fable-5");
         mk("d3", 3, 10.0, "claude-fable-5");
-        mk("d4", 4, 30.0, "claude-fable-5");
+        mk("d4", 4, 10.0, "claude-fable-5");
         // 本周窗口（重置在 2 天后 → 窗口始于 5 天前）内成本 = d1..d4 全部 60
         let resets = (chrono::Utc::now() + chrono::Duration::days(2)).to_rfc3339();
-        // U=20% → 配额 = 60*100/20 = 300，剩余 = 240，中位日成本 10 → 24 天
+        // U=20% → 配额 = 60*100/20 = 300，剩余 = 240
+        // 分母 = max(中位数 10, 最近3活跃日均值 (10+10+30)/3=16.67, 今日 0) = 16.67 → 14.4 天
         let d = weekly_days_left(&conn, 20.0, Some(&resets), None).unwrap();
-        assert!((d - 24.0).abs() < 0.01, "{d}");
+        assert!((d - 14.4).abs() < 0.05, "{d}");
+        // 爆发日：今天已烧 60 → 窗口成本 120，配额 600，剩余 480；分母 max(10,16.67,60)=60 → 8 天
+        mk("today", 0, 60.0, "claude-fable-5");
+        let d2 = weekly_days_left(&conn, 20.0, Some(&resets), None).unwrap();
+        assert!(d2 < d, "爆发日应立即缩短续航: {d2} vs {d}");
+        assert!((d2 - 8.0).abs() < 0.1, "{d2}");
         // 模型过滤：无匹配成本 → None
         assert!(weekly_days_left(&conn, 20.0, Some(&resets), Some("opus")).is_none());
         // 活跃日不足 → None（过滤出 0 天）
