@@ -43,16 +43,21 @@ body.theme-dark {
 }
 
 body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--bg); color: var(--text); }
-.float-body { background: var(--bg-translucent); border-radius: 18px; overflow: hidden; height: 100vh; border: 1px solid var(--line); }
-
-#float { display: flex; flex-direction: column; height: 100%; padding: 10px 12px; gap: 6px; }
-.f-top { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+/* 悬浮窗：背景/圆角放在 #float 上而不是 body ——
+   body 背景会被浏览器传播到整个窗口画布（不带圆角），造成直角衬底 */
+.float-body { background: transparent; height: 100vh; }
+#float {
+  display: flex; flex-direction: column; height: 100%; padding: 10px 12px; gap: 6px;
+  background: var(--bg-translucent); border-radius: 18px; border: 1px solid var(--line);
+  overflow: hidden;
+}
+.f-top { display: flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; }
 #f-hide { margin-left: auto; flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: var(--dim); font-size: 12px; }
 #f-hide:hover { background: var(--btn); color: var(--text); }
 /* 项目名固定宽度：箭头位置不随名字长短漂移，超长省略 */
-#f-project { flex: none; width: 88px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-#f-count { flex: none; width: 22px; text-align: center; font-size: 9px; }
-#f-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#f-project { flex: none; width: 78px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+#f-count { flex: none; width: 18px; text-align: center; font-size: 9px; }
+#f-model { flex: none; max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
 .dim { color: var(--dim); }
 .badge { flex: none; font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--btn); }
 .badge-subscription { background: var(--badge-sub-bg); color: var(--badge-sub-fg); }
