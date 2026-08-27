@@ -16,8 +16,15 @@ fn now_utc() -> String {
 }
 
 #[tauri::command]
-pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>) -> Result<(), String> {
+pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>, lang: Option<String>) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
+    if let Some(l) = lang {
+        match l.as_str() {
+            "auto" => { let _ = conn.execute("DELETE FROM meta WHERE key='ui_lang'", []); }
+            "zh" | "en" | "de" => store::meta_set(&conn, "ui_lang", &l).map_err(|e| e.to_string())?,
+            _ => return Err(format!("unknown lang {l}")),
+        }
+    }
     if let Some(t) = theme {
         if t != "light" && t != "dark" {
             return Err(format!("unknown theme {t}"));
@@ -137,6 +144,7 @@ pub fn settings_status(db: State<Db>) -> Value {
         "bad_lines": store::meta_get(&conn, "bad_lines"),
         "db_path": store::default_db_path().to_string_lossy(),
         "theme": store::meta_get(&conn, "ui_theme").unwrap_or_else(|| "light".into()),
+        "ui_lang": store::meta_get(&conn, "ui_lang"),
         "float_opacity": store::meta_get(&conn, "ui_float_opacity")
             .and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.95),
     })

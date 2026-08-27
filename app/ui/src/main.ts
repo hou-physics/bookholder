@@ -1,4 +1,5 @@
 import { api, applyTheme, onUiPrefsChanged, onUsageUpdated } from "./api";
+import { applyStaticI18n, resolveLang, setLang } from "./i18n";
 import { page as overview } from "./pages/overview";
 import { page as projects } from "./pages/projects";
 import { page as sessions } from "./pages/sessions";
@@ -31,8 +32,15 @@ onUsageUpdated(() => {
 onUiPrefsChanged(() => {
   void api.settings().then((s) => {
     applyTheme(s.theme);
-    route(); // 图表颜色随主题重建
+    setLang(resolveLang(s.ui_lang));
+    applyStaticI18n();
+    route(); // 图表颜色/文案随偏好重建
   });
 });
-void api.settings().then((s) => applyTheme(s.theme));
+void api.settings().then((s) => {
+  applyTheme(s.theme);
+  setLang(resolveLang(s.ui_lang));
+  applyStaticI18n();
+  route();
+});
 route();

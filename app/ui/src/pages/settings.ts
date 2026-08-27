@@ -1,4 +1,5 @@
 import { api, broadcastUiPrefsChanged } from "../api";
+import { t, t2, currentLang } from "../i18n";
 import { save } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import type { Page } from "../main";
@@ -11,7 +12,7 @@ async function exportAs(kind: "md" | "csv" | "json", status: HTMLElement): Promi
   });
   if (!dest) return;
   await api.exportReport(kind, dest);
-  status.textContent = `已导出 ${dest}`;
+  status.textContent = t2("st.exported", { p: dest });
 }
 
 export const page: Page = {
@@ -21,75 +22,85 @@ export const page: Page = {
       const auto = await isEnabled().catch(() => false);
       const feeRows = sc.fees
         .map(
-          (f, i) => `<tr><td>${f.from} 起</td><td>$${f.usd}/月</td>
-            <td><button class="fee-del" data-i="${i}">删除</button></td></tr>`,
+          (f, i) => `<tr><td>${f.from} ${t("st.feeFrom")}</td><td>$${f.usd}${t("st.perMonth")}</td>
+            <td><button class="fee-del" data-i="${i}">${t("st.delete")}</button></td></tr>`,
         )
         .join("");
-      root.innerHTML = `<h2 style="margin-bottom:10px">设置</h2>
+      const billingLabel =
+        s.billing_mode === "subscription" ? t("st.bSub") : s.billing_mode === "api" ? t("st.bApi") : t("st.bUnknown");
+      root.innerHTML = `<h2 style="margin-bottom:10px">${t("st.title")}</h2>
         <div class="panel" style="margin-bottom:10px">
-          <h3>价格数据</h3>
-          <p>已知 ${s.price_count} 个模型 ｜ 最后更新：${s.prices_last_fetch ?? "从未（使用内置快照）"}
-             ｜ 状态：${s.prices_last_status ?? "—"}</p>
-          <button id="btn-prices">立即刷新价格</button>
+          <h3>${t("st.prices")}</h3>
+          <p>${t2("st.knownModels", { n: s.price_count })} ｜ ${t("st.lastUpdate")}: ${s.prices_last_fetch ?? t("st.never")}
+             ｜ ${t("st.status")}: ${s.prices_last_status ?? "—"}</p>
+          <button id="btn-prices">${t("st.refresh")}</button>
         </div>
         <div class="panel" style="margin-bottom:10px">
-          <h3>计费口径（当前：${s.billing_mode === "subscription" ? "订阅（显示等值 API 成本）" : s.billing_mode === "api" ? "API（实际计费成本）" : "未知"}）</h3>
+          <h3>${t2("st.billing", { m: billingLabel })}</h3>
           <select id="sel-billing">
-            <option value="" ${!s.billing_override ? "selected" : ""}>自动检测</option>
-            <option value="subscription" ${s.billing_override === "subscription" ? "selected" : ""}>强制：订阅</option>
-            <option value="api" ${s.billing_override === "api" ? "selected" : ""}>强制：API</option>
+            <option value="" ${!s.billing_override ? "selected" : ""}>${t("st.auto")}</option>
+            <option value="subscription" ${s.billing_override === "subscription" ? "selected" : ""}>${t("st.forceSub")}</option>
+            <option value="api" ${s.billing_override === "api" ? "selected" : ""}>${t("st.forceApi")}</option>
           </select>
         </div>
         <div class="panel" style="margin-bottom:10px">
-          <h3>数据</h3>
-          <p>数据库：${s.db_path} ｜ 跳过行：${s.skip_lines ?? 0} ｜ 坏行：${s.bad_lines ?? 0}</p>
-          <button id="btn-backfill">全量重扫</button>
-          <button id="btn-md">导出 Markdown</button>
-          <button id="btn-csv">导出 CSV</button>
-          <button id="btn-json">导出 JSON</button>
+          <h3>${t("st.data")}</h3>
+          <p>${t("st.db")}: ${s.db_path} ｜ ${t("st.skipped")}: ${s.skip_lines ?? 0} ｜ ${t("st.bad")}: ${s.bad_lines ?? 0}</p>
+          <button id="btn-backfill">${t("st.backfill")}</button>
+          <button id="btn-md">${t("st.exportMd")}</button>
+          <button id="btn-csv">${t("st.exportCsv")}</button>
+          <button id="btn-json">${t("st.exportJson")}</button>
         </div>
         <div class="panel" style="margin-bottom:10px">
-          <h3>订阅月费（用于实付 vs 等值成本对比；检测到当前档位：${sc.detected_tier ?? "未知"}）</h3>
-          <table style="max-width:420px">${feeRows || `<tr><td class="dim" colspan="3">尚未填写——填了才有订阅对比面板</td></tr>`}</table>
+          <h3>${t2("st.fees", { t: sc.detected_tier ?? "—" })}</h3>
+          <table style="max-width:420px">${feeRows || `<tr><td class="dim" colspan="3">${t("st.noFees")}</td></tr>`}</table>
           <p style="margin-top:8px">
             <input type="date" id="fee-from" />
-            <input type="number" id="fee-usd" min="0" step="1" placeholder="美元/月" style="width:90px" />
-            <button id="fee-add">添加/覆盖该日期起的月费</button>
+            <input type="number" id="fee-usd" min="0" step="1" placeholder="${t("st.feeUsd")}" style="width:90px" />
+            <button id="fee-add">${t("st.addFee")}</button>
           </p>
-          <p class="dim">换过档位就加多段（如：历史 $100，升级日起 $200），成本按天折算跨段累加。</p>
+          <p class="dim">${t("st.feeHint")}</p>
         </div>
         <div class="panel" style="margin-bottom:10px">
-          <h3>外观</h3>
-          <label>主题
+          <h3>${t("st.appearance")}</h3>
+          <label>${t("st.theme")}
             <select id="sel-theme">
-              <option value="light" ${s.theme === "light" ? "selected" : ""}>浅色（橙调）</option>
-              <option value="dark" ${s.theme === "dark" ? "selected" : ""}>深色</option>
+              <option value="light" ${s.theme === "light" ? "selected" : ""}>${t("st.light")}</option>
+              <option value="dark" ${s.theme === "dark" ? "selected" : ""}>${t("st.dark")}</option>
             </select>
           </label>
-          <label style="margin-left:16px">悬浮窗透明度
+          <label style="margin-left:16px">${t("st.lang")}
+            <select id="sel-lang">
+              <option value="auto" ${!s.ui_lang ? "selected" : ""}>${t("st.langAuto")}</option>
+              <option value="zh" ${s.ui_lang === "zh" ? "selected" : ""}>中文</option>
+              <option value="en" ${s.ui_lang === "en" ? "selected" : ""}>English</option>
+              <option value="de" ${s.ui_lang === "de" ? "selected" : ""}>Deutsch</option>
+            </select>
+          </label>
+          <label style="margin-left:16px">${t("st.opacity")}
             <input type="range" id="rng-opacity" min="30" max="100" step="5" value="${Math.round(s.float_opacity * 100)}" />
             <span id="opacity-val">${Math.round(s.float_opacity * 100)}%</span>
           </label>
         </div>
         <div class="panel">
-          <h3>启动</h3>
-          <label><input type="checkbox" id="chk-auto" ${auto ? "checked" : ""}/> 开机自动启动</label>
-          <button id="btn-quit" style="margin-left:16px">退出 Bookholder（停止采集）</button>
+          <h3>${t("st.startup")}</h3>
+          <label><input type="checkbox" id="chk-auto" ${auto ? "checked" : ""}/> ${t("st.autostart")}</label>
+          <button id="btn-quit" style="margin-left:16px">${t("st.quit")}</button>
         </div>
         <p id="status" class="dim" style="margin-top:10px"></p>`;
 
       const status = root.querySelector("#status") as HTMLElement;
       const busy = async (btn: HTMLButtonElement, fn: () => Promise<string | void>): Promise<void> => {
         btn.disabled = true;
-        try { status.textContent = (await fn()) ?? "完成"; }
-        catch (e) { status.textContent = `失败：${e}`; }
+        try { status.textContent = (await fn()) ?? t("st.done"); }
+        catch (e) { status.textContent = t2("st.failed", { e: e instanceof Error ? e.message : String(e) }); }
         finally { btn.disabled = false; }
       };
       const q = (id: string): HTMLButtonElement => root.querySelector(id) as HTMLButtonElement;
       q("#btn-prices").addEventListener("click", () => void busy(q("#btn-prices"), () => api.refreshPrices()));
       q("#btn-backfill").addEventListener("click", () => void busy(q("#btn-backfill"), async () => {
         const st = await api.backfill();
-        return `重扫完成：新增 ${st.added}，跳过 ${st.skipped}，坏行 ${st.bad}`;
+        return t2("st.backfillDone", { a: st.added, s: st.skipped, b: st.bad });
       }));
       q("#btn-md").addEventListener("click", () => void busy(q("#btn-md"), () => exportAs("md", status)));
       q("#btn-csv").addEventListener("click", () => void busy(q("#btn-csv"), () => exportAs("csv", status)));
@@ -104,11 +115,11 @@ export const page: Page = {
       q("#fee-add").addEventListener("click", () => void busy(q("#fee-add"), async () => {
         const from = (root.querySelector("#fee-from") as HTMLInputElement).value;
         const usd = Number((root.querySelector("#fee-usd") as HTMLInputElement).value);
-        if (!from || !(usd >= 0)) return "请先选日期并填月费";
+        if (!from || !(usd >= 0)) return t("st.fillFirst");
         const fees = sc.fees.filter((f) => f.from !== from);
         fees.push({ from, usd });
         await saveFees(fees);
-        return "已保存";
+        return t("st.saved");
       }));
       root.querySelectorAll(".fee-del").forEach((btn) =>
         btn.addEventListener("click", () => {
@@ -121,6 +132,11 @@ export const page: Page = {
           .setUiPrefs((e.target as HTMLSelectElement).value, null)
           .then(() => broadcastUiPrefsChanged());
       });
+      (root.querySelector("#sel-lang") as HTMLSelectElement).addEventListener("change", (e) => {
+        void api
+          .setUiPrefs(null, null, (e.target as HTMLSelectElement).value)
+          .then(() => broadcastUiPrefsChanged());
+      });
       const rng = root.querySelector("#rng-opacity") as HTMLInputElement;
       rng.addEventListener("input", () => {
         (root.querySelector("#opacity-val") as HTMLElement).textContent = `${rng.value}%`;
@@ -131,8 +147,9 @@ export const page: Page = {
       q("#btn-quit").addEventListener("click", () => void api.quitApp());
       (root.querySelector("#chk-auto") as HTMLInputElement).addEventListener("change", (e) => {
         const on = (e.target as HTMLInputElement).checked;
-        void (on ? enable() : disable()).then(() => (status.textContent = on ? "已开启自启" : "已关闭自启"));
+        void (on ? enable() : disable()).then(() => (status.textContent = on ? t("st.autoOn") : t("st.autoOff")));
       });
+      void currentLang; // referenced to avoid unused import when tree-shaken
     })();
   },
 };

@@ -1,15 +1,16 @@
 import { api, esc, fmtUsd, fmtTok, ProjectRow, SessionRow, EventRow } from "../api";
+import { t } from "../i18n";
 import { mountChart } from "../charts";
 import type { Page } from "../main";
 
 export function eventTable(evs: EventRow[]): string {
   const rows = evs.map((e) => `<tr>
-    <td>${esc(e.ts)}</td><td>${esc(e.model)}</td><td>${e.is_sidechain ? "sub" : "主"}</td>
+    <td>${esc(e.ts)}</td><td>${esc(e.model)}</td><td>${e.is_sidechain ? "sub" : t("e.main")}</td>
     <td>${fmtTok(e.input)}</td><td>${fmtTok(e.output)}</td><td>${fmtTok(e.thinking)}</td>
     <td>${fmtTok(e.cache_write_5m + e.cache_write_1h)}</td><td>${fmtTok(e.cache_read)}</td>
-    <td>${e.cost_usd == null ? "未计价" : fmtUsd(e.cost_usd)}</td></tr>`).join("");
-  return `<table><tr><th>时间</th><th>模型</th><th>类型</th><th>in</th><th>out</th>
-    <th>think</th><th>cache写</th><th>cache读</th><th>成本</th></tr>${rows}</table>`;
+    <td>${e.cost_usd == null ? t("unpriced") : fmtUsd(e.cost_usd)}</td></tr>`).join("");
+  return `<table><tr><th>${t("e.time")}</th><th>${t("e.model")}</th><th>${t("e.type")}</th><th>in</th><th>out</th>
+    <th>${t("e.think")}</th><th>${t("e.cacheW")}</th><th>${t("e.cacheR")}</th><th>${t("e.cost")}</th></tr>${rows}</table>`;
 }
 
 function mountProjectCharts(daily: Awaited<ReturnType<typeof api.projectOverview>>["daily"], models: Awaited<ReturnType<typeof api.projectOverview>>["models"]): void {
@@ -36,9 +37,9 @@ function mountProjectCharts(daily: Awaited<ReturnType<typeof api.projectOverview
 
 async function showSessions(root: HTMLElement, p: ProjectRow): Promise<void> {
   const sessions = await api.sessions(p.id);
-  root.innerHTML = `<button id="back">← 项目列表</button>
+  root.innerHTML = `<button id="back">${t("p.back")}</button>
     <h2 style="margin:10px 0">${esc(p.display_name)} <span class="dim">${fmtUsd(p.cost_usd)}</span></h2>
-    <div class="chart-grid" style="margin-bottom:10px"><div class="panel"><h3>近 30 天成本（按模型）</h3><div id="p-daily" class="chart"></div></div><div class="panel"><h3>模型占比</h3><div id="p-models" class="chart"></div></div></div>
+    <div class="chart-grid" style="margin-bottom:10px"><div class="panel"><h3>${t("o.chartDaily")}</h3><div id="p-daily" class="chart"></div></div><div class="panel"><h3>${t("o.chartModels")}</h3><div id="p-models" class="chart"></div></div></div>
     <div id="s-list"></div>`;
   root.querySelector("#back")!.addEventListener("click", () => void page.render(root));
 
@@ -51,9 +52,9 @@ async function showSessions(root: HTMLElement, p: ProjectRow): Promise<void> {
     div.style.marginBottom = "8px";
     div.innerHTML = `<div class="clickable sess-head" style="display:flex;gap:12px;cursor:pointer">
       <b>${esc(s.session_id.slice(0, 8))}</b><span class="dim">${esc(s.started_at)} → ${esc(s.ended_at)}</span>
-      <span>${fmtUsd(s.cost_usd)}</span><span class="dim">${s.events} 次请求</span>
-      <span class="dim">subagent ${fmtUsd(s.side_cost)}</span>
-      <span class="badge badge-${esc(s.billing_mode)}">${s.billing_mode === "subscription" ? "订阅" : esc(s.billing_mode)}</span>
+      <span>${fmtUsd(s.cost_usd)}</span><span class="dim">${s.events} ${t("p.requests")}</span>
+      <span class="dim">${t("subagent")} ${fmtUsd(s.side_cost)}</span>
+      <span class="badge badge-${esc(s.billing_mode)}">${s.billing_mode === "subscription" ? t("badge.sub") : esc(s.billing_mode)}</span>
     </div><div class="sess-body" style="display:none;margin-top:8px"></div>`;
     div.querySelector(".sess-head")!.addEventListener("click", () => {
       const body = div.querySelector(".sess-body") as HTMLElement;
@@ -76,8 +77,8 @@ export const page: Page = {
       const canAllocate = sc.actual_usd > 0 && sc.equiv_usd > 0;
       const alloc = (equiv: number): string =>
         canAllocate ? fmtUsd((sc.actual_usd * equiv) / sc.equiv_usd) : "—";
-      root.innerHTML = `<h2 style="margin-bottom:10px">项目</h2>
-        <table><tr><th>项目</th><th>等值成本</th>${canAllocate ? "<th>分摊实付</th>" : ""}<th>tokens</th><th>会话</th><th>活跃天数</th><th>最近活动</th></tr>
+      root.innerHTML = `<h2 style="margin-bottom:10px">${t("p.title")}</h2>
+        <table><tr><th>${t("p.title")}</th><th>${t("p.equiv")}</th>${canAllocate ? `<th>${t("p.alloc")}</th>` : ""}<th>tokens</th><th>${t("p.sessions")}</th><th>${t("p.activeDays")}</th><th>${t("p.last")}</th></tr>
         ${projects.map((p, i) => `<tr class="clickable" data-i="${i}">
           <td><b>${esc(p.display_name)}</b> <span class="dim">${esc(p.cwd)}</span></td>
           <td>${fmtUsd(p.cost_usd)}</td>${canAllocate ? `<td>${alloc(p.cost_usd)}</td>` : ""}<td>${fmtTok(p.tokens)}</td>

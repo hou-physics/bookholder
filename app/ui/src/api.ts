@@ -45,7 +45,7 @@ export interface SubComparison {
   detected_tier: string | null;
 }
 export interface SettingsStatus {
-  theme: string; float_opacity: number;
+  theme: string; float_opacity: number; ui_lang: string | null;
   prices_last_fetch: string | null; prices_last_status: string | null; price_count: number;
   billing_mode: string; billing_override: string | null;
   skip_lines: string | null; bad_lines: string | null; db_path: string;
@@ -67,8 +67,8 @@ export const api = {
   projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
   setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
-  setUiPrefs: (theme: string | null, opacity: number | null) =>
-    invoke<void>("set_ui_prefs", { theme, opacity }),
+  setUiPrefs: (theme: string | null, opacity: number | null, lang: string | null = null) =>
+    invoke<void>("set_ui_prefs", { theme, opacity, lang }),
   openDashboard: () => invoke<void>("open_dashboard"),
   quitApp: () => invoke<void>("quit_app"),
 };

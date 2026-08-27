@@ -8,26 +8,26 @@
 <body class="float-body">
   <div id="float">
     <div class="f-top">
-      <button id="f-prev" class="f-arrow" title="上一个活跃任务">‹</button>
+      <button id="f-prev" class="f-arrow" data-i18n-title="f.prev">‹</button>
       <span id="f-project">—</span>
       <span id="f-count" class="dim"></span>
-      <button id="f-next" class="f-arrow" title="下一个活跃任务">›</button>
+      <button id="f-next" class="f-arrow" data-i18n-title="f.next">›</button>
       <span id="f-badge" class="badge">…</span>
       <span id="f-model" class="dim"></span>
-      <button id="f-expand" title="展开/收起当前任务 24 小时明细">⌄</button>
-      <button id="f-hide" title="隐藏悬浮窗（菜单栏图标可恢复，不是退出）">✕</button>
+      <button id="f-expand" data-i18n-title="f.expandTip">⌄</button>
+      <button id="f-hide" data-i18n-title="f.hideTip">✕</button>
     </div>
     <div class="f-nums">
-      <div><label>今日</label><b id="f-today">$0</b></div>
-      <div><label id="f-proj-label">该任务累计</label><b id="f-proj">$0</b></div>
-      <div><label>燃烧率/时</label><b id="f-burn">$0</b></div>
+      <div><label data-i18n="f.today">今日</label><b id="f-today">$0</b></div>
+      <div><label id="f-proj-label" data-i18n="f.taskTotal">该任务累计</label><b id="f-proj">$0</b></div>
+      <div><label data-i18n="f.burn">燃烧率/时</label><b id="f-burn">$0</b></div>
     </div>
     <div id="f-spark" class="spark"></div>
     <div id="f-detail" class="f-detail">
-      <div class="dim f-detail-label">当前任务 · <span id="f-detail-name"></span></div>
+      <div class="dim f-detail-label"><span data-i18n="f.currentTask">当前任务</span> · <span id="f-detail-name"></span></div>
       <div id="f-spark2" class="spark"></div>
     </div>
-    <div class="spark-axis"><span>24 小时前</span><span>每柱 = 1 小时</span><span>现在</span></div>
+    <div class="spark-axis"><span data-i18n="f.h24">24 小时前</span><span data-i18n="f.perBar">每柱 = 1 小时</span><span data-i18n="f.now">现在</span></div>
   </div>
   <script type="module" src="/src/float.ts"></script>
 </body>

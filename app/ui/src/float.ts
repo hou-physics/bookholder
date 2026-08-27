@@ -1,11 +1,14 @@
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { api, applyTheme, fmtUsd, onUiPrefsChanged, onUsageUpdated, FloatData } from "./api";
+import { applyStaticI18n, resolveLang, setLang, t } from "./i18n";
 
 const win = getCurrentWindow();
 
 async function applyPrefs(): Promise<void> {
   const s = await api.settings();
   applyTheme(s.theme);
+  setLang(resolveLang(s.ui_lang));
+  applyStaticI18n();
   document.body.style.opacity = String(s.float_opacity); // 整窗透明度（窗口本体 transparent）
 }
 
@@ -33,7 +36,7 @@ function renderSparkInto(spark: HTMLElement, hourly: FloatData["hourly"]): void 
     const top = h.side_cost > 0 ? side : main;
     if (h.main_cost + h.side_cost > 0) top.style.borderRadius = "2.5px 2.5px 0 0";
     col.append(side, main);
-    col.title = `${h.hour}  主 ${fmtUsd(h.main_cost)} / 子 ${fmtUsd(h.side_cost)}`;
+    col.title = `${h.hour}  ${t("e.main")} ${fmtUsd(h.main_cost)} / ${t("subagent")} ${fmtUsd(h.side_cost)}`;
     spark.appendChild(col);
   }
 }
@@ -47,11 +50,11 @@ function renderSelection(d: FloatData): void {
   const cur = viewList[idx];
   const multi = viewList.length > 1;
   el("f-project").textContent = cur ? cur.project_name : d.project_name;
-  el("f-project").title = cur && multi ? `活跃任务 ${idx + 1}/${viewList.length}（近30分 ${fmtUsd(cur.recent_cost)}）` : "";
+  el("f-project").title = cur && multi ? `${t("f.activeTip")} ${idx + 1}/${viewList.length} (${t("f.last30")} ${fmtUsd(cur.recent_cost)})` : "";
   el("f-count").textContent = multi ? `${idx + 1}/${viewList.length}` : "";
   el("f-model").textContent = shortModel(cur ? cur.last_model : d.model);
   el("f-proj").textContent = fmtUsd(cur ? cur.total_cost : d.project_cost);
-  el("f-proj-label").textContent = multi ? "该任务累计" : "当前项目";
+  el("f-proj-label").textContent = multi ? t("f.taskTotal") : t("f.currentProject");
   (el("f-prev") as HTMLButtonElement).style.display = multi ? "" : "none";
   (el("f-next") as HTMLButtonElement).style.display = multi ? "" : "none";
 }
@@ -71,14 +74,10 @@ async function refresh(): Promise<void> {
     selectedId = null; // 选中的任务已不活跃，回落
   }
   const badge = el("f-badge");
-  badge.textContent = d.billing_mode === "subscription" ? "订阅" : d.billing_mode === "api" ? "API" : "?";
+  badge.textContent = d.billing_mode === "subscription" ? t("badge.sub") : d.billing_mode === "api" ? t("badge.api") : "?";
   badge.className = `badge badge-${d.billing_mode}`;
   badge.title =
-    d.billing_mode === "subscription"
-      ? "订阅模式：所有金额为等值 API 成本（这些 token 若按 API 计费的价格），不是你的实际账单"
-      : d.billing_mode === "api"
-        ? "API 模式：金额为实际计费成本"
-        : "";
+    d.billing_mode === "subscription" ? t("f.tipSub") : d.billing_mode === "api" ? t("f.tipApi") : "";
   el("f-today").textContent = fmtUsd(d.today_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
   renderSelection(d);
