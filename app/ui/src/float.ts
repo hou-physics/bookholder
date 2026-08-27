@@ -30,10 +30,38 @@ function renderSpark(hourly: FloatData["hourly"]): void {
   }
 }
 
+// 活跃任务切换：selectedId 记住用户选择；项目掉出活跃列表后回落到消耗最高者。
+let selectedId: number | null = null;
+let viewList: { project_id: number; project_name: string; recent_cost: number; total_cost: number; last_model: string }[] = [];
+
+function renderSelection(d: FloatData): void {
+  const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
+  const cur = viewList[idx];
+  const multi = viewList.length > 1;
+  el("f-project").textContent = cur ? cur.project_name : d.project_name;
+  el("f-project").title = cur && multi ? `活跃任务 ${idx + 1}/${viewList.length}（近30分 ${fmtUsd(cur.recent_cost)}）` : "";
+  el("f-count").textContent = multi ? `${idx + 1}/${viewList.length}` : "";
+  el("f-model").textContent = shortModel(cur ? cur.last_model : d.model);
+  el("f-proj").textContent = fmtUsd(cur ? cur.total_cost : d.project_cost);
+  el("f-proj-label").textContent = multi ? "该任务累计" : "当前项目";
+  (el("f-prev") as HTMLButtonElement).style.display = multi ? "" : "none";
+  (el("f-next") as HTMLButtonElement).style.display = multi ? "" : "none";
+}
+
+function cycle(step: number): void {
+  if (viewList.length < 2) return;
+  const idx = Math.max(0, viewList.findIndex((a) => a.project_id === selectedId));
+  const next = (idx + step + viewList.length) % viewList.length;
+  selectedId = viewList[next].project_id;
+  void refresh();
+}
+
 async function refresh(): Promise<void> {
   const d = await api.floatData();
-  el("f-project").textContent = d.project_name;
-  el("f-model").textContent = shortModel(d.model);
+  viewList = d.active;
+  if (selectedId != null && !viewList.some((a) => a.project_id === selectedId)) {
+    selectedId = null; // 选中的任务已不活跃，回落
+  }
   const badge = el("f-badge");
   badge.textContent = d.billing_mode === "subscription" ? "订阅" : d.billing_mode === "api" ? "API" : "?";
   badge.className = `badge badge-${d.billing_mode}`;
@@ -44,21 +72,8 @@ async function refresh(): Promise<void> {
         ? "API 模式：金额为实际计费成本"
         : "";
   el("f-today").textContent = fmtUsd(d.today_cost);
-  el("f-proj").textContent = fmtUsd(d.project_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
-  // 并发任务：近 30 分钟内有消耗的项目 ≥2 个时列出（否则隐藏该行）
-  const activeEl = el("f-active");
-  if (d.active.length >= 2) {
-    activeEl.style.display = "block";
-    activeEl.textContent =
-      `▶ ${d.active.length} 个任务: ` +
-      d.active.map((a) => `${a.project_name} ${fmtUsd(a.recent_cost)}`).join(" · ");
-    activeEl.title = `最近 30 分钟内活跃的项目及其窗口内消耗\n${d.active
-      .map((a) => `${a.project_name}: ${fmtUsd(a.recent_cost)}`)
-      .join("\n")}`;
-  } else {
-    activeEl.style.display = "none";
-  }
+  renderSelection(d);
   renderSpark(d.hourly);
 }
 
@@ -66,7 +81,7 @@ async function refresh(): Promise<void> {
 // 悬浮窗表面全被子元素覆盖，属性永远不命中 —— 因此改为程序化拖拽。
 document.body.addEventListener("mousedown", (e) => {
   if (e.button !== 0) return;
-  if ((e.target as HTMLElement).closest("#f-hide")) return;
+  if ((e.target as HTMLElement).closest("button")) return; // 按钮不触发拖拽/双击
   if (e.detail >= 2) {
     void api.openDashboard(); // 双击的第二次 mousedown：开面板
   } else {
@@ -74,6 +89,8 @@ document.body.addEventListener("mousedown", (e) => {
   }
 });
 el("f-hide").addEventListener("click", () => void win.hide());
+el("f-prev").addEventListener("click", () => cycle(-1));
+el("f-next").addEventListener("click", () => cycle(1));
 onUsageUpdated(() => void refresh());
 void refresh();
 setInterval(() => void refresh(), 60_000); // 兜底：burn rate 随时间衰减也要更新

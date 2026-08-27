@@ -46,8 +46,17 @@ fn main() {
             let menu = Menu::with_items(app, &[&show, &float, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Bookholder")
+                .tooltip("Bookholder（双击呼出悬浮窗，右键菜单）")
                 .menu(&menu)
+                .show_menu_on_left_click(false) // 让双击可达；菜单改为右键
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        if let Some(w) = tray.app_handle().get_webview_window("float") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {

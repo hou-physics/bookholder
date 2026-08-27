@@ -163,20 +163,26 @@ pub fn session_rows(conn: &Connection, project_id: i64) -> Vec<SessionRow> {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ActiveProjectRow {
+    pub project_id: i64,
     pub project_name: String,
     pub recent_cost: f64,
+    pub total_cost: f64,
+    pub last_model: String,
 }
 
-/// 最近 `mins` 分钟内有事件的项目（并发任务视图），按窗口内消耗降序。
+/// 最近 `mins` 分钟内有事件的项目（并发任务切换视图），按窗口内消耗降序。
 pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
     let mut stmt = conn.prepare(
-        "SELECT p.display_name, COALESCE(SUM(e.cost_usd),0)
+        "SELECT p.id, p.display_name, COALESCE(SUM(e.cost_usd),0),
+                (SELECT COALESCE(SUM(cost_usd),0) FROM usage_events WHERE project_id = p.id),
+                (SELECT model FROM usage_events WHERE project_id = p.id ORDER BY ts DESC LIMIT 1)
          FROM usage_events e JOIN projects p ON p.id = e.project_id
          WHERE e.ts >= datetime('now', ?1)
-         GROUP BY p.id ORDER BY 2 DESC LIMIT 5",
+         GROUP BY p.id ORDER BY 3 DESC LIMIT 5",
     ).unwrap();
     stmt.query_map([format!("-{mins} minutes")], |r| Ok(ActiveProjectRow {
-        project_name: r.get(0)?, recent_cost: r.get(1)?,
+        project_id: r.get(0)?, project_name: r.get(1)?, recent_cost: r.get(2)?,
+        total_cost: r.get(3)?, last_model: r.get(4)?,
     })).map(|it| it.flatten().collect()).unwrap_or_default()
 }
 
@@ -344,7 +350,10 @@ mod tests {
         assert_eq!(act.len(), 2);
         assert_eq!(act[0].project_name, "hot");
         assert!((act[0].recent_cost - 3.0).abs() < 1e-9);
+        assert!((act[0].total_cost - 3.0).abs() < 1e-9); // hot 项目全部消耗都在窗口内
+        assert_eq!(act[0].last_model, "claude-fable-5");
         assert_eq!(act[1].project_name, "warm");
+        assert!(act[0].project_id > 0);
     }
 
     #[test]

@@ -14,7 +14,9 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: #14161
 .f-nums { display: flex; justify-content: space-between; }
 .f-nums label { display: block; font-size: 10px; color: #8b90a0; }
 .f-nums b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.f-active { display: none; font-size: 10px; color: #9fc2e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-arrow { flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: #8b90a0; font-size: 13px; }
+.f-arrow:hover { background: #2a2d38; color: #e8eaf0; }
+#f-count { font-size: 9px; flex: none; }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }
 .spark-axis { display: flex; justify-content: space-between; font-size: 9px; color: #6b7080; line-height: 1; }
 .spark-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
