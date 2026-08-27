@@ -6,7 +6,16 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <div id="app">Bookholder 面板加载中…</div>
+  <div id="layout">
+    <nav id="nav">
+      <h1>Bookholder</h1>
+      <a href="#overview" class="active">总览</a>
+      <a href="#projects">项目</a>
+      <a href="#sessions">会话明细</a>
+      <a href="#settings">设置</a>
+    </nav>
+    <main id="page"></main>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
