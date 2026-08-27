@@ -236,7 +236,6 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "bookholder-core",
- "chrono",
  "clap",
  "predicates",
  "rusqlite",

@@ -38,6 +38,18 @@ pub fn daily_by_model(conn: &Connection, days: i64) -> Vec<DailyModelRow> {
     })).map(|it| it.flatten().collect()).unwrap_or_default()
 }
 
+pub fn project_daily(conn: &Connection, project_id: i64, days: i64) -> Vec<DailyModelRow> {
+    let mut stmt = conn.prepare(
+        "SELECT date(ts, 'localtime') d, model, COALESCE(SUM(cost_usd),0)
+         FROM usage_events
+         WHERE ts >= datetime('now', ?1) AND project_id = ?2
+         GROUP BY d, model ORDER BY d",
+    ).unwrap();
+    stmt.query_map(params![format!("-{days} days"), project_id], |r| Ok(DailyModelRow {
+        date: r.get(0)?, model: r.get(1)?, cost_usd: r.get(2)?,
+    })).map(|it| it.flatten().collect()).unwrap_or_default()
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct HourRow { pub hour: String, pub main_cost: f64, pub side_cost: f64 }
 
@@ -49,8 +61,20 @@ pub fn hourly_last24(conn: &Connection) -> Vec<HourRow> {
          FROM usage_events WHERE ts >= datetime('now', '-24 hours')
          GROUP BY h ORDER BY h",
     ).unwrap();
-    stmt.query_map([], |r| Ok(HourRow { hour: r.get(0)?, main_cost: r.get(1)?, side_cost: r.get(2)? }))
-        .map(|it| it.flatten().collect()).unwrap_or_default()
+    let rows: Vec<HourRow> = stmt.query_map([], |r| Ok(HourRow { hour: r.get(0)?, main_cost: r.get(1)?, side_cost: r.get(2)? }))
+        .map(|it| it.flatten().collect()).unwrap_or_default();
+
+    // 零填充到固定 24 小时，缺失小时补 0，保证悬浮窗 sparkline 长度恒定
+    use chrono::{Duration, Local};
+    let now = Local::now();
+    (0..24)
+        .map(|i| {
+            let label = (now - Duration::hours(23 - i)).format("%Y-%m-%d %H:00").to_string();
+            rows.iter().find(|r| r.hour == label).cloned().unwrap_or(HourRow {
+                hour: label, main_cost: 0.0, side_cost: 0.0,
+            })
+        })
+        .collect()
 }
 
 pub fn burn_rate_per_hour(conn: &Connection) -> f64 {
@@ -72,6 +96,18 @@ pub fn model_split(conn: &Connection, from: Option<&str>, to: Option<&str>) -> V
          GROUP BY model ORDER BY 2 DESC",
     ).unwrap();
     stmt.query_map(params![from, to], |r| Ok(ModelSplitRow {
+        model: r.get(0)?, cost_usd: r.get(1)?, input: r.get(2)?, output: r.get(3)?, events: r.get(4)?,
+    })).map(|it| it.flatten().collect()).unwrap_or_default()
+}
+
+pub fn project_models(conn: &Connection, project_id: i64) -> Vec<ModelSplitRow> {
+    let mut stmt = conn.prepare(
+        "SELECT model, COALESCE(SUM(cost_usd),0), COALESCE(SUM(input_tokens),0),
+                COALESCE(SUM(output_tokens),0), COUNT(*)
+         FROM usage_events WHERE project_id = ?1
+         GROUP BY model ORDER BY 2 DESC",
+    ).unwrap();
+    stmt.query_map([project_id], |r| Ok(ModelSplitRow {
         model: r.get(0)?, cost_usd: r.get(1)?, input: r.get(2)?, output: r.get(3)?, events: r.get(4)?,
     })).map(|it| it.flatten().collect()).unwrap_or_default()
 }
@@ -246,5 +282,37 @@ mod tests {
         let conn = crate::store::open_memory().unwrap();
         seed(&conn);
         assert_eq!(burn_rate_per_hour(&conn), 0.0); // 种子数据都在过去
+    }
+
+    #[test]
+    fn project_scoped_daily_and_model_split() {
+        let conn = crate::store::open_memory().unwrap();
+        seed(&conn);
+        let pid_a: i64 = conn.query_row("SELECT id FROM projects WHERE slug='-a'", [], |r| r.get(0)).unwrap();
+        let pid_b: i64 = conn.query_row("SELECT id FROM projects WHERE slug='-b'", [], |r| r.get(0)).unwrap();
+
+        // project -a 有两条事件（两种模型），project -b 有一条
+        let daily_a = project_daily(&conn, pid_a, 400);
+        assert_eq!(daily_a.len(), 2);
+        assert!(daily_a.iter().all(|r| r.date == "2026-08-26"));
+
+        let daily_b = project_daily(&conn, pid_b, 400);
+        assert_eq!(daily_b.len(), 1);
+        assert_eq!(daily_b[0].model, "claude-fable-5");
+
+        let models_a = project_models(&conn, pid_a);
+        assert_eq!(models_a.len(), 2);
+        let models_b = project_models(&conn, pid_b);
+        assert_eq!(models_b.len(), 1);
+        assert_eq!(models_b[0].events, 1);
+    }
+
+    #[test]
+    fn hourly_last24_zero_fills_to_24_rows() {
+        let conn = crate::store::open_memory().unwrap();
+        // 空数据库
+        let rows = hourly_last24(&conn);
+        assert_eq!(rows.len(), 24);
+        assert!(rows.iter().all(|r| r.main_cost == 0.0 && r.side_cost == 0.0));
     }
 }

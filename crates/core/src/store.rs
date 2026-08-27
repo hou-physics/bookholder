@@ -65,13 +65,17 @@ pub fn open_db(path: &Path) -> rusqlite::Result<Connection> {
     }
     let conn = Connection::open(path)?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch(SCHEMA)?;
+    conn.pragma_update(None, "user_version", 1)?;
     Ok(conn)
 }
 
 pub fn open_memory() -> rusqlite::Result<Connection> {
     let conn = Connection::open_in_memory()?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch(SCHEMA)?;
+    conn.pragma_update(None, "user_version", 1)?;
     Ok(conn)
 }
 
@@ -277,6 +281,17 @@ mod tests {
 
         // Verify directory was created
         assert!(db_path.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn user_version_set_on_open_db() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("uv.db");
+
+        let conn = open_db(&db_path).unwrap();
+
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(version, 1);
     }
 
     #[test]

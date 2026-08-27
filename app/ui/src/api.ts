@@ -40,6 +40,7 @@ export const api = {
   overview: () => invoke<Overview>("overview"),
   projects: () => invoke<ProjectRow[]>("projects_list"),
   sessions: (projectId: number) => invoke<SessionRow[]>("project_sessions", { projectId }),
+  projectOverview: (projectId: number) => invoke<{ daily: DailyModelRow[]; models: ModelSplitRow[] }>("project_overview", { projectId }),
   events: (sessionPk: number) => invoke<EventRow[]>("session_events", { sessionPk }),
   settings: () => invoke<SettingsStatus>("settings_status"),
   refreshPrices: () => invoke<string>("refresh_prices"),
@@ -55,6 +56,10 @@ export function onUsageUpdated(cb: () => void): void {
 
 export function fmtUsd(n: number): string {
   return n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`;
+}
+
+export function esc(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
 }
 
 export function fmtTok(n: number): string {

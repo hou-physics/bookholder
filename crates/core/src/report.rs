@@ -26,6 +26,11 @@ pub fn markdown_report(conn: &Connection) -> String {
     md
 }
 
+/// RFC4180 字段转义：内部 `"` 双写，并整体加引号。
+fn q(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
 pub fn csv_events(conn: &Connection, project_id: Option<i64>) -> String {
     let mut out = String::from("ts,project,session,model,is_sidechain,input,output,thinking,cache_write_5m,cache_write_1h,cache_read,cost_usd\n");
     let mut stmt = conn.prepare(
@@ -41,7 +46,7 @@ pub fn csv_events(conn: &Connection, project_id: Option<i64>) -> String {
         let cost: Option<f64> = r.get(11)?;
         Ok(format!(
             "{},{},{},{},{},{},{},{},{},{},{},{}",
-            r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?,
+            q(&r.get::<_, String>(0)?), q(&r.get::<_, String>(1)?), q(&r.get::<_, String>(2)?), q(&r.get::<_, String>(3)?),
             r.get::<_, i64>(4)?, r.get::<_, i64>(5)?, r.get::<_, i64>(6)?, r.get::<_, i64>(7)?,
             r.get::<_, i64>(8)?, r.get::<_, i64>(9)?, r.get::<_, i64>(10)?,
             cost.map(|c| format!("{c:.6}")).unwrap_or_default()

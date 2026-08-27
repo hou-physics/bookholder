@@ -26,6 +26,7 @@ fn main() {
             commands::overview,
             commands::projects_list,
             commands::project_sessions,
+            commands::project_overview,
             commands::session_events,
             commands::settings_status,
             commands::refresh_prices,

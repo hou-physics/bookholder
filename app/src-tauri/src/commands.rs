@@ -93,7 +93,7 @@ pub fn settings_status(db: State<Db>) -> Value {
 }
 
 #[tauri::command]
-pub fn refresh_prices(db: State<Db>) -> Result<String, String> {
+pub async fn refresh_prices(db: State<'_, Db>) -> Result<String, String> {
     // 网络请求在拿锁之前完成，避免长时间占用 Mutex<Connection> 阻塞其它命令。
     let prices = match pricing::fetch_remote_prices() {
         Ok(p) => p,
@@ -119,16 +119,16 @@ pub fn refresh_prices(db: State<Db>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn run_backfill(db: State<Db>) -> Value {
+pub async fn run_backfill(db: State<'_, Db>) -> Result<Value, ()> {
     let conn = db.0.lock().unwrap();
     let mode = billing::effective_mode(&conn, &home());
     let st = ingest::scan_all(&conn, &store::claude_projects_dir(), &mode);
     let _ = pricing::reprice_null_costs(&conn);
-    serde_json::to_value(st).unwrap_or(Value::Null)
+    Ok(serde_json::to_value(st).unwrap_or(Value::Null))
 }
 
 #[tauri::command]
-pub fn export_report(db: State<Db>, kind: String, dest: String) -> Result<(), String> {
+pub async fn export_report(db: State<'_, Db>, kind: String, dest: String) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
     let content = match kind.as_str() {
         "md" => report::markdown_report(&conn),
@@ -137,6 +137,15 @@ pub fn export_report(db: State<Db>, kind: String, dest: String) -> Result<(), St
         _ => return Err(format!("unknown kind {kind}")),
     };
     std::fs::write(&dest, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_overview(db: State<Db>, project_id: i64) -> Value {
+    let conn = db.0.lock().unwrap();
+    json!({
+        "daily": queries::project_daily(&conn, project_id, 30),
+        "models": queries::project_models(&conn, project_id),
+    })
 }
 
 #[tauri::command]
