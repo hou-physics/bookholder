@@ -4,7 +4,9 @@ import { mountChart, palette } from "../charts";
 import type { Page } from "../main";
 
 function card(label: string, t: Totals): string {
-  return `<div class="card"><label>${label}</label><b>${fmtUsd(t.cost_usd)}</b>
+  const tokens = t.input + t.output + t.cache_read + t.cache_write;
+  return `<div class="card"><label>${label}</label><b>${fmtTok(tokens)} tok</b>
+    <span class="usd">${fmtUsd(t.cost_usd)}</span>
     <span class="dim">in ${fmtTok(t.input)} · out ${fmtTok(t.output)} · ${i18nt("o.cacheR")} ${fmtTok(t.cache_read)} · ${i18nt("o.cacheW")} ${fmtTok(t.cache_write)}</span>
     ${t.unpriced > 0 ? `<span class="warn">${t.unpriced} ${i18nt("unpriced")}</span>` : ""}</div>`;
 }

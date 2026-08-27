@@ -2,24 +2,24 @@
 
 /* ---- 主题变量：默认浅色（暖橙调），body.theme-dark 切换深色 ---- */
 body {
-  --bg: #f7f5f1;
-  --bg-translucent: rgba(247, 245, 241, 0.94);
-  --panel: #ffffff;
-  --panel-hover: #f3ece4;
-  --text: #33291f;
-  --dim: #9a8a78;
-  --line: #eadfd3;
-  --btn: #f3ece4;
-  --btn-hover: #eaddcd;
-  --accent: #5f8d89;        /* 柔青 */
-  --accent-2: #a58a68;      /* 暖灰褐（subagent/次级） */
-  --good: #2f9e63;
-  --warn: #b97f1d;
-  --note-bg: #e9f0ee;
-  --note-fg: #44675f;
-  --note-strong: #2f4a44;
-  --badge-sub-bg: #e5f3ea;  --badge-sub-fg: #2f9e63;
-  --badge-api-bg: #efe9df;  --badge-api-fg: #8a6d3b;
+  --bg: #f3f4f3;
+  --bg-translucent: rgba(243, 244, 243, 0.94);
+  --panel: #fcfcfb;
+  --panel-hover: #eceeec;
+  --text: #2b2e2c;
+  --dim: #878d88;
+  --line: #e2e5e2;
+  --btn: #eaece9;
+  --btn-hover: #dfe2df;
+  --accent: #4f8a84;        /* 灰青 */
+  --accent-2: #7d94b5;      /* 雾蓝（subagent/次级） */
+  --good: #3d9268;
+  --warn: #b08a2e;
+  --note-bg: #e6eeec;
+  --note-fg: #3e6a63;
+  --note-strong: #2c4c46;
+  --badge-sub-bg: #e2efe8;  --badge-sub-fg: #35855c;
+  --badge-api-bg: #e7eaf0;  --badge-api-fg: #5c6f92;
 }
 body.theme-dark {
   --bg: #14161c;
@@ -82,11 +82,15 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 #nav h1 { font-size: 15px; margin-bottom: 12px; padding-left: 8px; color: var(--accent); }
 #nav a { color: var(--dim); text-decoration: none; padding: 7px 10px; border-radius: 9px; font-size: 13px; }
 #nav a.active { background: var(--btn); color: var(--text); }
-#page { flex: 1; overflow-y: auto; padding: 18px; }
+#page { flex: 1; overflow-y: auto; padding: 20px 22px; }
+#page h2 { font-size: 17px; font-weight: 650; letter-spacing: 0.01em; }
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
 .card { background: var(--panel); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--line); }
 .card label { font-size: 11px; color: var(--dim); }
-.card b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.card b { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.card .usd { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+.metrics-line { font-size: 12px; color: var(--dim); margin: -4px 0 10px; }
 .card .dim { font-size: 10px; }
 .warn { color: var(--warn); font-size: 10px; }
 .billing-note { background: var(--note-bg); color: var(--note-fg); border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
@@ -95,16 +99,16 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .sub-compare { margin-bottom: 12px; }
 .sub-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .sub-grid label { display: block; font-size: 11px; color: var(--dim); }
-.sub-grid b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.sub-grid b { font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.25; }
 .good { color: var(--good); }
 .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .panel { background: var(--panel); border-radius: 14px; padding: 12px; border: 1px solid var(--line); }
-.panel h3 { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+.panel h3 { font-size: 11px; color: var(--dim); margin-bottom: 8px; letter-spacing: 0.05em; }
 .chart { height: 260px; }
 .chart-slim { height: 120px; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
-th { color: var(--dim); font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { text-align: left; padding: 8px 9px; border-bottom: 1px solid var(--line); line-height: 1.45; }
+th { color: var(--dim); font-weight: 500; font-size: 11px; letter-spacing: 0.04em; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover { background: var(--panel-hover); }
 button { background: var(--btn); color: var(--text); border: none; border-radius: 9px; padding: 7px 14px; font-size: 12px; cursor: pointer; }

@@ -65,6 +65,8 @@ export const api = {
   setBillingOverride: (mode: string) => invoke<void>("set_billing_override", { mode }),
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
+  projectMetrics: (projectId: number) =>
+    invoke<{ latest: { date: string; files: number; code_bytes: number; commits: number | null; top_ext: string }; days: number } | null>("project_metrics", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
   setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
   setUiPrefs: (theme: string | null, opacity: number | null, lang: string | null = null) =>

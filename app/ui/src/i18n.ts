@@ -60,7 +60,7 @@ const D: Record<string, [string, string, string]> = {
   "o.chartModels": ["模型占比", "By model", "Nach Modell"],
   "o.chartSide": ["主对话 vs Subagent", "Main vs subagent", "Hauptdialog vs. Subagent"],
   "o.cost": ["成本", "Cost", "Kosten"],
-  "o.noteSub": ["💡 订阅模式：以下所有金额是<b>等值 API 成本</b>——这些 token 若按 API 价格计费需要花多少钱。你的实际支出是订阅费本身；这个数字越高，说明订阅越划算。", "💡 Subscription mode: all amounts below are <b>API-equivalent cost</b> — what these tokens would cost at API prices. Your actual spend is the subscription fee; the higher this number, the better the deal.", "💡 Abo-Modus: Alle Beträge sind <b>API-Äquivalenzkosten</b> — was diese Tokens zu API-Preisen kosten würden. Ihre tatsächlichen Ausgaben sind die Abo-Gebühr; je höher die Zahl, desto besser das Abo."],
+  "o.noteSub": ["订阅模式：以下所有金额是<b>等值 API 成本</b>——这些 token 若按 API 价格计费需要花多少钱。你的实际支出是订阅费本身；这个数字越高，说明订阅越划算。", "Subscription mode: all amounts below are <b>API-equivalent cost</b> — what these tokens would cost at API prices. Your actual spend is the subscription fee; the higher this number, the better the deal.", "Abo-Modus: Alle Beträge sind <b>API-Äquivalenzkosten</b> — was diese Tokens zu API-Preisen kosten würden. Ihre tatsächlichen Ausgaben sind die Abo-Gebühr; je höher die Zahl, desto besser das Abo."],
   "o.noteApi": ["API 模式：以下金额为实际计费成本。", "API mode: amounts below are actual billed cost.", "API-Modus: Die Beträge sind tatsächliche Kosten."],
   "o.subTitle": ["订阅对比", "Subscription comparison", "Abo-Vergleich"],
   "o.days": ["天", "days", "Tage"],
@@ -95,6 +95,11 @@ const D: Record<string, [string, string, string]> = {
   "e.main": ["主", "main", "Haupt"],
   "s.title": ["会话明细", "Sessions", "Sitzungen"],
   "s.recent": ["最近 {n} 个会话（全部项目，点击展开逐请求）", "Latest {n} sessions (all projects; click to expand per-request)", "Letzte {n} Sitzungen (alle Projekte; zum Aufklappen klicken)"],
+
+  "m.files": ["代码文件", "code files", "Code-Dateien"],
+  "m.code": ["代码量", "code size", "Code-Umfang"],
+  "m.commits": ["提交", "commits", "Commits"],
+  "m.days": ["快照天数", "snapshot days", "Snapshot-Tage"],
 
   // —— 设置 ——
   "st.title": ["设置", "Settings", "Einstellungen"],

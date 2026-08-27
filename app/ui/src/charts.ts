@@ -1,7 +1,7 @@
 import * as echarts from "echarts";
 
 const DARK_PALETTE = ["#4f6df5", "#b46ff5", "#6fd49a", "#d4b16f", "#f56d6d", "#6fc4d4"];
-const LIGHT_PALETTE = ["#5f8d89", "#a58a68", "#7d94b5", "#b5847d", "#8aa66f", "#9a86ad"];
+const LIGHT_PALETTE = ["#4f8a84", "#7d94b5", "#8aa66f", "#9a86ad", "#b5847d", "#5f9ea8"];
 
 function isDark(): boolean {
   return document.body.classList.contains("theme-dark");
@@ -16,7 +16,7 @@ export function mountChart(el: HTMLElement, option: echarts.EChartsOption): echa
   const chart = echarts.init(el, undefined, { renderer: "canvas" });
   chart.setOption({
     color: palette(),
-    textStyle: { color: isDark() ? "#e8eaf0" : "#33291f" },
+    textStyle: { color: isDark() ? "#e8eaf0" : "#2b2e2c" },
     backgroundColor: "transparent",
     ...option,
   });

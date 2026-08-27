@@ -39,11 +39,21 @@ async function showSessions(root: HTMLElement, p: ProjectRow): Promise<void> {
   const sessions = await api.sessions(p.id);
   root.innerHTML = `<button id="back">${t("p.back")}</button>
     <h2 style="margin:10px 0">${esc(p.display_name)} <span class="dim">${fmtUsd(p.cost_usd)}</span></h2>
+    <div id="p-metrics" class="metrics-line"></div>
     <div class="chart-grid" style="margin-bottom:10px"><div class="panel"><h3>${t("o.chartDaily")}</h3><div id="p-daily" class="chart"></div></div><div class="panel"><h3>${t("o.chartModels")}</h3><div id="p-models" class="chart"></div></div></div>
     <div id="s-list"></div>`;
   root.querySelector("#back")!.addEventListener("click", () => void page.render(root));
 
   void api.projectOverview(p.id).then((o) => mountProjectCharts(o.daily, o.models));
+  void api.projectMetrics(p.id).then((m) => {
+    if (!m) return;
+    const el = root.querySelector("#p-metrics");
+    if (el) el.textContent =
+      `${t("m.files")} ${m.latest.files} · ${t("m.code")} ${fmtTok(m.latest.code_bytes)}B` +
+      (m.latest.commits != null ? ` · ${t("m.commits")} ${m.latest.commits}` : "") +
+      (m.latest.top_ext ? ` · ${m.latest.top_ext}` : "") +
+      ` · ${t("m.days")} ${m.days}`;
+  });
 
   const list = root.querySelector("#s-list")!;
   for (const s of sessions) {
@@ -51,7 +61,7 @@ async function showSessions(root: HTMLElement, p: ProjectRow): Promise<void> {
     div.className = "panel";
     div.style.marginBottom = "8px";
     div.innerHTML = `<div class="clickable sess-head" style="display:flex;gap:12px;cursor:pointer">
-      <b>${esc(s.session_id.slice(0, 8))}</b><span class="dim">${esc(s.started_at)} → ${esc(s.ended_at)}</span>
+      <b class="mono">${esc(s.session_id.slice(0, 8))}</b><span class="dim">${esc(s.started_at)} → ${esc(s.ended_at)}</span>
       <span>${fmtUsd(s.cost_usd)}</span><span class="dim">${s.events} ${t("p.requests")}</span>
       <span class="dim">${t("subagent")} ${fmtUsd(s.side_cost)}</span>
       <span class="badge badge-${esc(s.billing_mode)}">${s.billing_mode === "subscription" ? t("badge.sub") : esc(s.billing_mode)}</span>

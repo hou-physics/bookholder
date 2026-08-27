@@ -108,7 +108,7 @@ fn ensure_project(conn: &Connection, slug: &str, cwd: &str, ts: &str) -> rusqlit
          VALUES (?1, ?2, ?3, ?4, ?4)
          ON CONFLICT(slug) DO UPDATE SET
            cwd = CASE WHEN excluded.cwd != '' THEN excluded.cwd ELSE projects.cwd END,
-           display_name = CASE WHEN excluded.display_name != '' THEN excluded.display_name ELSE projects.display_name END,
+           display_name = CASE WHEN projects.display_name = '' THEN excluded.display_name ELSE projects.display_name END,
            last_seen = MAX(projects.last_seen, excluded.last_seen)",
         params![slug, cwd, display, ts],
     )?;

@@ -17,7 +17,7 @@ export const page: Page = {
         div.style.marginBottom = "8px";
         div.innerHTML = `<div class="clickable sess-head" style="display:flex;gap:12px;align-items:center;cursor:pointer">
           <b>${esc(s.project_name)}</b>
-          <span class="dim">${esc(s.session_id.slice(0, 8))}</span>
+          <span class="dim mono">${esc(s.session_id.slice(0, 8))}</span>
           <span class="dim">${esc(s.started_at)} → ${esc(s.ended_at)}</span>
           <span>${fmtUsd(s.cost_usd)}</span>
           <span class="dim">${s.events} ${t("p.requests")}</span>

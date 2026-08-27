@@ -34,6 +34,7 @@ fn main() {
             commands::export_report,
             commands::set_billing_override,
             commands::set_ui_prefs,
+            commands::project_metrics,
             commands::project_hourly,
             commands::sessions_recent,
             commands::subscription_comparison,
@@ -86,6 +87,8 @@ fn main() {
                 let _ = pricing::reprice_null_costs(&conn);
                 let _ = handle.emit("usage-updated", &st);
                 maybe_refresh_prices(&conn);
+                let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                let _ = bookholder_core::metrics::collect_all(&conn, &today);
 
                 let handle2 = handle.clone();
                 let db_path2 = db_path.clone();
@@ -104,6 +107,8 @@ fn main() {
                         std::thread::sleep(std::time::Duration::from_secs(3600));
                         if let Ok(c) = store::open_db(&db_path) {
                             maybe_refresh_prices(&c);
+                            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                            let _ = bookholder_core::metrics::collect_all(&c, &today);
                         }
                     },
                     Err(e) => eprintln!("watcher failed: {e}"),

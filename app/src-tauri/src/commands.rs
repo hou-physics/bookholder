@@ -1,4 +1,4 @@
-use bookholder_core::{billing, ingest, pricing, queries, report, store, subscription};
+use bookholder_core::{billing, ingest, metrics, pricing, queries, report, store, subscription};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -38,6 +38,15 @@ pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>, 
         store::meta_set(&conn, "ui_float_opacity", &o.to_string()).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn project_metrics(db: State<Db>, project_id: i64) -> Value {
+    let conn = db.0.lock().unwrap();
+    match metrics::latest_for(&conn, project_id) {
+        Some((row, days)) => json!({ "latest": row, "days": days }),
+        None => Value::Null,
+    }
 }
 
 #[tauri::command]

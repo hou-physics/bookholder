@@ -58,6 +58,8 @@ fn main() {
         Cmd::Backfill => {
             let st = ingest::scan_all(&conn, &store::claude_projects_dir(), &mode);
             let _ = pricing::reprice_null_costs(&conn);
+            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+            let _ = bookholder_core::metrics::collect_all(&conn, &today);
             println!("added: {} skipped: {} bad: {}", st.added, st.skipped, st.bad);
         }
         Cmd::Live => {
