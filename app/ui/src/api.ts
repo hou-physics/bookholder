@@ -29,6 +29,13 @@ export interface Overview {
   today: Totals; week: Totals; month: Totals; all: Totals;
   daily: DailyModelRow[]; models: ModelSplitRow[]; main_cost: number; side_cost: number;
 }
+export interface FeePeriod { from: string; usd: number }
+export interface SubComparison {
+  fees: FeePeriod[]; window_start: string | null; window_days: number;
+  actual_usd: number; equiv_usd: number; api_usd: number; savings_usd: number;
+  leverage: number | null; month_equiv_usd: number; month_fee_usd: number | null;
+  detected_tier: string | null;
+}
 export interface SettingsStatus {
   prices_last_fetch: string | null; prices_last_status: string | null; price_count: number;
   billing_mode: string; billing_override: string | null;
@@ -47,6 +54,8 @@ export const api = {
   backfill: () => invoke<{ added: number; skipped: number; bad: number }>("run_backfill"),
   exportReport: (kind: string, dest: string) => invoke<void>("export_report", { kind, dest }),
   setBillingOverride: (mode: string) => invoke<void>("set_billing_override", { mode }),
+  subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
+  setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
   openDashboard: () => invoke<void>("open_dashboard"),
 };
 

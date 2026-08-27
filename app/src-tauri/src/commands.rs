@@ -1,4 +1,4 @@
-use bookholder_core::{billing, ingest, pricing, queries, report, store};
+use bookholder_core::{billing, ingest, pricing, queries, report, store, subscription};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -13,6 +13,21 @@ fn home() -> PathBuf {
 
 fn now_utc() -> String {
     chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+#[tauri::command]
+pub fn subscription_comparison(db: State<Db>) -> Value {
+    let conn = db.0.lock().unwrap();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let tier = billing::detect_tier(&home());
+    serde_json::to_value(subscription::comparison(&conn, &today, tier)).unwrap_or(Value::Null)
+}
+
+#[tauri::command]
+pub fn set_subscription_fees(db: State<Db>, fees_json: String) -> Result<(), String> {
+    let fees = subscription::parse_fees(&fees_json)?;
+    let conn = db.0.lock().unwrap();
+    subscription::save_fees(&conn, &fees).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

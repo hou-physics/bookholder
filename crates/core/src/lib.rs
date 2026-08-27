@@ -6,4 +6,5 @@ pub mod pricing;
 pub mod queries;
 pub mod report;
 pub mod store;
+pub mod subscription;
 pub mod watcher;

@@ -42,6 +42,17 @@ pub fn effective_mode(conn: &Connection, home: &Path) -> String {
     detect(home, std::env::var("ANTHROPIC_API_KEY").ok().as_deref()).as_str().to_string()
 }
 
+/// 订阅档位（如 "default_claude_max_20x"），来自 ~/.claude.json 的 oauthAccount。
+/// 只反映当前状态——历史换档在本地数据里不可考。
+pub fn detect_tier(home: &Path) -> Option<String> {
+    let txt = std::fs::read_to_string(home.join(".claude.json")).ok()?;
+    let v: Value = serde_json::from_str(&txt).ok()?;
+    v.get("oauthAccount")?
+        .get("organizationRateLimitTier")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -71,12 +71,16 @@ async function showSessions(root: HTMLElement, p: ProjectRow): Promise<void> {
 export const page: Page = {
   render(root: HTMLElement): void {
     void (async () => {
-      const projects = await api.projects();
+      const [projects, sc] = await Promise.all([api.projects(), api.subscriptionComparison()]);
+      // 分摊实付：订阅实付按各项目等值成本占比反推（仅在填写了月费时显示）
+      const canAllocate = sc.actual_usd > 0 && sc.equiv_usd > 0;
+      const alloc = (equiv: number): string =>
+        canAllocate ? fmtUsd((sc.actual_usd * equiv) / sc.equiv_usd) : "—";
       root.innerHTML = `<h2 style="margin-bottom:10px">项目</h2>
-        <table><tr><th>项目</th><th>成本</th><th>tokens</th><th>会话</th><th>活跃天数</th><th>最近活动</th></tr>
+        <table><tr><th>项目</th><th>等值成本</th>${canAllocate ? "<th>分摊实付</th>" : ""}<th>tokens</th><th>会话</th><th>活跃天数</th><th>最近活动</th></tr>
         ${projects.map((p, i) => `<tr class="clickable" data-i="${i}">
           <td><b>${esc(p.display_name)}</b> <span class="dim">${esc(p.cwd)}</span></td>
-          <td>${fmtUsd(p.cost_usd)}</td><td>${fmtTok(p.tokens)}</td>
+          <td>${fmtUsd(p.cost_usd)}</td>${canAllocate ? `<td>${alloc(p.cost_usd)}</td>` : ""}<td>${fmtTok(p.tokens)}</td>
           <td>${p.sessions}</td><td>${p.active_days}</td><td>${esc(p.last_seen)}</td></tr>`).join("")}
         </table>`;
       root.querySelectorAll("tr.clickable").forEach((tr) =>

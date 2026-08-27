@@ -17,8 +17,14 @@ async function exportAs(kind: "md" | "csv" | "json", status: HTMLElement): Promi
 export const page: Page = {
   render(root: HTMLElement): void {
     void (async () => {
-      const s = await api.settings();
+      const [s, sc] = await Promise.all([api.settings(), api.subscriptionComparison()]);
       const auto = await isEnabled().catch(() => false);
+      const feeRows = sc.fees
+        .map(
+          (f, i) => `<tr><td>${f.from} 起</td><td>$${f.usd}/月</td>
+            <td><button class="fee-del" data-i="${i}">删除</button></td></tr>`,
+        )
+        .join("");
       root.innerHTML = `<h2 style="margin-bottom:10px">设置</h2>
         <div class="panel" style="margin-bottom:10px">
           <h3>价格数据</h3>
@@ -41,6 +47,16 @@ export const page: Page = {
           <button id="btn-md">导出 Markdown</button>
           <button id="btn-csv">导出 CSV</button>
           <button id="btn-json">导出 JSON</button>
+        </div>
+        <div class="panel" style="margin-bottom:10px">
+          <h3>订阅月费（用于实付 vs 等值成本对比；检测到当前档位：${sc.detected_tier ?? "未知"}）</h3>
+          <table style="max-width:420px">${feeRows || `<tr><td class="dim" colspan="3">尚未填写——填了才有订阅对比面板</td></tr>`}</table>
+          <p style="margin-top:8px">
+            <input type="date" id="fee-from" />
+            <input type="number" id="fee-usd" min="0" step="1" placeholder="美元/月" style="width:90px" />
+            <button id="fee-add">添加/覆盖该日期起的月费</button>
+          </p>
+          <p class="dim">换过档位就加多段（如：历史 $100，升级日起 $200），成本按天折算跨段累加。</p>
         </div>
         <div class="panel">
           <h3>启动</h3>
@@ -67,6 +83,25 @@ export const page: Page = {
       (root.querySelector("#sel-billing") as HTMLSelectElement).addEventListener("change", (e) => {
         void api.setBillingOverride((e.target as HTMLSelectElement).value).then(() => page.render(root));
       });
+      const saveFees = async (fees: { from: string; usd: number }[]): Promise<void> => {
+        await api.setSubscriptionFees(JSON.stringify(fees));
+        page.render(root);
+      };
+      q("#fee-add").addEventListener("click", () => void busy(q("#fee-add"), async () => {
+        const from = (root.querySelector("#fee-from") as HTMLInputElement).value;
+        const usd = Number((root.querySelector("#fee-usd") as HTMLInputElement).value);
+        if (!from || !(usd >= 0)) return "请先选日期并填月费";
+        const fees = sc.fees.filter((f) => f.from !== from);
+        fees.push({ from, usd });
+        await saveFees(fees);
+        return "已保存";
+      }));
+      root.querySelectorAll(".fee-del").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const i = Number((btn as HTMLElement).dataset.i);
+          void saveFees(sc.fees.filter((_, idx) => idx !== i));
+        }),
+      );
       (root.querySelector("#chk-auto") as HTMLInputElement).addEventListener("change", (e) => {
         const on = (e.target as HTMLInputElement).checked;
         void (on ? enable() : disable()).then(() => (status.textContent = on ? "已开启自启" : "已关闭自启"));

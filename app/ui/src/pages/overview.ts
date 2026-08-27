@@ -10,14 +10,33 @@ function card(label: string, t: Totals): string {
 
 export const page: Page = {
   render(root: HTMLElement): void {
-    root.innerHTML = `<div id="billing-note"></div><div id="cards" class="cards"></div>
+    root.innerHTML = `<div id="billing-note"></div><div id="sub-compare"></div><div id="cards" class="cards"></div>
       <div class="chart-grid">
         <div class="panel"><h3>近 30 天成本（按模型）</h3><div id="c-daily" class="chart"></div></div>
         <div class="panel"><h3>模型占比</h3><div id="c-models" class="chart"></div></div>
         <div class="panel"><h3>主对话 vs Subagent</h3><div id="c-side" class="chart chart-slim"></div></div>
       </div>`;
     void (async () => {
-      const [o, s] = await Promise.all([api.overview(), api.settings()]);
+      const [o, s, sc] = await Promise.all([api.overview(), api.settings(), api.subscriptionComparison()]);
+      if (sc.equiv_usd > 0) {
+        const subEl = document.getElementById("sub-compare")!;
+        if (sc.fees.length === 0) {
+          subEl.innerHTML = `<p class="billing-note">想看订阅实付 vs 等值成本的对比？到<a href="#settings">设置页</a>填一下订阅月费即可。</p>`;
+        } else {
+          const lev = sc.leverage ? `${sc.leverage.toFixed(1)}×` : "—";
+          const monthFee = sc.month_fee_usd != null ? fmtUsd(sc.month_fee_usd) : "—";
+          subEl.innerHTML = `<div class="panel sub-compare">
+            <h3>订阅对比（${sc.window_start ?? ""} 起，${Math.round(sc.window_days)} 天）</h3>
+            <div class="sub-grid">
+              <div><label>订阅实付（折算）</label><b>${fmtUsd(sc.actual_usd)}</b></div>
+              <div><label>等值 API 成本</label><b>${fmtUsd(sc.equiv_usd)}</b></div>
+              <div><label>省下</label><b class="good">${fmtUsd(sc.savings_usd)}</b></div>
+              <div><label>杠杆</label><b class="good">${lev}</b></div>
+            </div>
+            <p class="dim" style="margin-top:6px">本月：等值 ${fmtUsd(sc.month_equiv_usd)} ｜ 月费 ${monthFee}${sc.api_usd > 0 ? ` ｜ 另有 API 实付 ${fmtUsd(sc.api_usd)}（未参与分摊）` : ""}</p>
+          </div>`;
+        }
+      }
       if (s.billing_mode === "subscription") {
         document.getElementById("billing-note")!.innerHTML =
           `<p class="billing-note">💡 订阅模式：以下所有金额是<b>等值 API 成本</b>——这些 token 若按 API 价格计费需要花多少钱。你的实际支出是订阅费本身；这个数字越高，说明订阅越划算。</p>`;
