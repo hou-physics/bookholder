@@ -29,6 +29,10 @@ export interface Overview {
   today: Totals; week: Totals; month: Totals; all: Totals;
   daily: DailyModelRow[]; models: ModelSplitRow[]; main_cost: number; side_cost: number;
 }
+export interface RecentSessionRow {
+  id: number; session_id: string; project_name: string; started_at: string;
+  ended_at: string; billing_mode: string; cost_usd: number; events: number; side_cost: number;
+}
 export interface FeePeriod { from: string; usd: number }
 export interface SubComparison {
   fees: FeePeriod[]; window_start: string | null; window_days: number;
@@ -54,6 +58,7 @@ export const api = {
   backfill: () => invoke<{ added: number; skipped: number; bad: number }>("run_backfill"),
   exportReport: (kind: string, dest: string) => invoke<void>("export_report", { kind, dest }),
   setBillingOverride: (mode: string) => invoke<void>("set_billing_override", { mode }),
+  sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),
   setSubscriptionFees: (feesJson: string) => invoke<void>("set_subscription_fees", { feesJson }),
   openDashboard: () => invoke<void>("open_dashboard"),

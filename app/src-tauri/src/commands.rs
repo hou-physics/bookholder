@@ -16,6 +16,12 @@ fn now_utc() -> String {
 }
 
 #[tauri::command]
+pub fn sessions_recent(db: State<Db>, limit: i64) -> Value {
+    let conn = db.0.lock().unwrap();
+    serde_json::to_value(queries::recent_sessions(&conn, limit)).unwrap_or(Value::Null)
+}
+
+#[tauri::command]
 pub fn subscription_comparison(db: State<Db>) -> Value {
     let conn = db.0.lock().unwrap();
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();

@@ -2,7 +2,7 @@ import { api, esc, fmtUsd, fmtTok, ProjectRow, SessionRow, EventRow } from "../a
 import { mountChart } from "../charts";
 import type { Page } from "../main";
 
-function eventTable(evs: EventRow[]): string {
+export function eventTable(evs: EventRow[]): string {
   const rows = evs.map((e) => `<tr>
     <td>${esc(e.ts)}</td><td>${esc(e.model)}</td><td>${e.is_sidechain ? "sub" : "主"}</td>
     <td>${fmtTok(e.input)}</td><td>${fmtTok(e.output)}</td><td>${fmtTok(e.thinking)}</td>

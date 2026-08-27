@@ -162,6 +162,31 @@ pub fn session_rows(conn: &Connection, project_id: i64) -> Vec<SessionRow> {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RecentSessionRow {
+    pub id: i64, pub session_id: String, pub project_name: String, pub started_at: String,
+    pub ended_at: String, pub billing_mode: String, pub cost_usd: f64, pub events: i64,
+    pub side_cost: f64,
+}
+
+/// 跨项目按开始时间倒序的会话流水（会话明细页）。
+pub fn recent_sessions(conn: &Connection, limit: i64) -> Vec<RecentSessionRow> {
+    let mut stmt = conn.prepare(
+        "SELECT s.id, s.session_id, p.display_name, COALESCE(s.started_at,''), COALESCE(s.ended_at,''),
+                COALESCE(s.billing_mode,'unknown'), COALESCE(SUM(e.cost_usd),0), COUNT(e.id),
+                COALESCE(SUM(CASE WHEN e.is_sidechain=1 THEN e.cost_usd ELSE 0 END),0)
+         FROM sessions s
+         JOIN projects p ON p.id = s.project_id
+         LEFT JOIN usage_events e ON e.session_id = s.id
+         GROUP BY s.id ORDER BY s.started_at DESC LIMIT ?1",
+    ).unwrap();
+    stmt.query_map([limit], |r| Ok(RecentSessionRow {
+        id: r.get(0)?, session_id: r.get(1)?, project_name: r.get(2)?, started_at: r.get(3)?,
+        ended_at: r.get(4)?, billing_mode: r.get(5)?, cost_usd: r.get(6)?, events: r.get(7)?,
+        side_cost: r.get(8)?,
+    })).map(|it| it.flatten().collect()).unwrap_or_default()
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct EventRow {
     pub ts: String, pub model: String, pub is_sidechain: bool, pub input: i64, pub output: i64,
     pub thinking: i64, pub cache_write_5m: i64, pub cache_write_1h: i64, pub cache_read: i64,
@@ -275,6 +300,19 @@ mod tests {
         let c = current_context(&conn).unwrap();
         assert_eq!(c.project_name, "beta");
         assert_eq!(c.model, "claude-fable-5");
+    }
+
+    #[test]
+    fn recent_sessions_flat_across_projects_newest_first() {
+        let conn = crate::store::open_memory().unwrap();
+        seed(&conn);
+        let rows = recent_sessions(&conn, 10);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].project_name, "beta"); // s2 起于 08-27，晚于 s1
+        assert_eq!(rows[1].project_name, "alpha");
+        assert_eq!(rows[1].events, 2);
+        assert!((rows[1].side_cost - 0.2).abs() < 1e-9);
+        assert_eq!(recent_sessions(&conn, 1).len(), 1);
     }
 
     #[test]
