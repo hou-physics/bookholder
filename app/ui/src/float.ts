@@ -116,19 +116,24 @@ async function setExpanded(on: boolean): Promise<void> {
 
 // Tauri 的 data-tauri-drag-region 只匹配 mousedown 的精确目标元素，
 // 悬浮窗表面全被子元素覆盖，属性永远不命中 —— 因此改为程序化拖拽。
+// 所有按钮动作在 mousedown 处理：窗口未激活时的首次点击只投递 mousedown，
+// DOM click 不触发——用 mousedown 保证"第一次点击就生效"。
 document.body.addEventListener("mousedown", (e) => {
   if (e.button !== 0) return;
-  if ((e.target as HTMLElement).closest("button")) return; // 按钮不触发拖拽/双击
+  const btn = (e.target as HTMLElement).closest("button");
+  if (btn) {
+    if (btn.id === "f-hide") void win.hide();
+    else if (btn.id === "f-expand") void setExpanded(!expanded);
+    else if (btn.id === "f-prev") cycle(-1);
+    else if (btn.id === "f-next") cycle(1);
+    return;
+  }
   if (e.detail >= 2) {
     void api.openDashboard(); // 双击的第二次 mousedown：开面板
   } else {
     void win.startDragging();
   }
 });
-el("f-hide").addEventListener("click", () => void win.hide());
-el("f-expand").addEventListener("click", () => void setExpanded(!expanded));
-el("f-prev").addEventListener("click", () => cycle(-1));
-el("f-next").addEventListener("click", () => cycle(1));
 onUsageUpdated(() => void refresh());
 onUiPrefsChanged(() => void applyPrefs());
 void applyPrefs();
