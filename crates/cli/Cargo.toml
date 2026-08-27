@@ -1,0 +1,11 @@
+[package]
+name = "bookholder"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bookholder"
+path = "src/main.rs"
+
+[dependencies]
+bookholder-core = { path = "../core" }
