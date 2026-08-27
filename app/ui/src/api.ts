@@ -21,9 +21,10 @@ export interface EventRow {
   thinking: number; cache_write_5m: number; cache_write_1h: number; cache_read: number;
   cost_usd: number | null;
 }
+export interface ActiveProjectRow { project_name: string; recent_cost: number }
 export interface FloatData {
   today_cost: number; project_cost: number; project_name: string; model: string;
-  burn_rate: number; billing_mode: string; hourly: HourRow[];
+  burn_rate: number; billing_mode: string; hourly: HourRow[]; active: ActiveProjectRow[];
 }
 export interface Overview {
   today: Totals; week: Totals; month: Totals; all: Totals;

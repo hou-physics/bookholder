@@ -46,6 +46,19 @@ async function refresh(): Promise<void> {
   el("f-today").textContent = fmtUsd(d.today_cost);
   el("f-proj").textContent = fmtUsd(d.project_cost);
   el("f-burn").textContent = fmtUsd(d.burn_rate);
+  // 并发任务：近 30 分钟内有消耗的项目 ≥2 个时列出（否则隐藏该行）
+  const activeEl = el("f-active");
+  if (d.active.length >= 2) {
+    activeEl.style.display = "block";
+    activeEl.textContent =
+      `▶ ${d.active.length} 个任务: ` +
+      d.active.map((a) => `${a.project_name} ${fmtUsd(a.recent_cost)}`).join(" · ");
+    activeEl.title = `最近 30 分钟内活跃的项目及其窗口内消耗\n${d.active
+      .map((a) => `${a.project_name}: ${fmtUsd(a.recent_cost)}`)
+      .join("\n")}`;
+  } else {
+    activeEl.style.display = "none";
+  }
   renderSpark(d.hourly);
 }
 

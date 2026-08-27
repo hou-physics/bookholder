@@ -53,6 +53,7 @@ pub fn float_data(db: State<Db>) -> Value {
         "burn_rate": queries::burn_rate_per_hour(&conn),
         "billing_mode": billing::effective_mode(&conn, &home()),
         "hourly": queries::hourly_last24(&conn),
+        "active": queries::active_projects(&conn, 30),
     })
 }
 

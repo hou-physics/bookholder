@@ -162,6 +162,25 @@ pub fn session_rows(conn: &Connection, project_id: i64) -> Vec<SessionRow> {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ActiveProjectRow {
+    pub project_name: String,
+    pub recent_cost: f64,
+}
+
+/// 最近 `mins` 分钟内有事件的项目（并发任务视图），按窗口内消耗降序。
+pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
+    let mut stmt = conn.prepare(
+        "SELECT p.display_name, COALESCE(SUM(e.cost_usd),0)
+         FROM usage_events e JOIN projects p ON p.id = e.project_id
+         WHERE e.ts >= datetime('now', ?1)
+         GROUP BY p.id ORDER BY 2 DESC LIMIT 5",
+    ).unwrap();
+    stmt.query_map([format!("-{mins} minutes")], |r| Ok(ActiveProjectRow {
+        project_name: r.get(0)?, recent_cost: r.get(1)?,
+    })).map(|it| it.flatten().collect()).unwrap_or_default()
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct RecentSessionRow {
     pub id: i64, pub session_id: String, pub project_name: String, pub started_at: String,
     pub ended_at: String, pub billing_mode: String, pub cost_usd: f64, pub events: i64,
@@ -300,6 +319,32 @@ mod tests {
         let c = current_context(&conn).unwrap();
         assert_eq!(c.project_name, "beta");
         assert_eq!(c.model, "claude-fable-5");
+    }
+
+    #[test]
+    fn active_projects_only_within_window() {
+        let conn = crate::store::open_memory().unwrap();
+        seed(&conn); // 种子数据都在过去，不算活跃
+        let mk = |key: &str, mins_ago: i64, cost: f64, sess: &str, cwd: &str| {
+            let ts = (chrono::Utc::now() - chrono::Duration::minutes(mins_ago))
+                .format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let e = crate::model::UsageEvent {
+                dedup_key: key.into(), ts, session_id: sess.into(), cwd: cwd.into(),
+                model: "claude-fable-5".into(), is_sidechain: false,
+                input_tokens: 1, output_tokens: 1, thinking_tokens: 0,
+                cache_write_5m: 0, cache_write_1h: 0, cache_read: 0,
+            };
+            crate::store::record_event(&conn, &format!("-{}", cwd.rsplit('/').next().unwrap()), &e, Some(cost), "subscription").unwrap();
+        };
+        mk("a1", 5, 2.0, "sa", "/u/hot");
+        mk("a2", 10, 1.0, "sa", "/u/hot");
+        mk("b1", 20, 0.5, "sb", "/u/warm");
+        mk("c1", 90, 9.0, "sc", "/u/cold"); // 窗口外
+        let act = active_projects(&conn, 30);
+        assert_eq!(act.len(), 2);
+        assert_eq!(act[0].project_name, "hot");
+        assert!((act[0].recent_cost - 3.0).abs() < 1e-9);
+        assert_eq!(act[1].project_name, "warm");
     }
 
     #[test]
