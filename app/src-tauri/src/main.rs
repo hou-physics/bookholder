@@ -34,6 +34,7 @@ fn main() {
             commands::export_report,
             commands::set_billing_override,
             commands::set_ui_prefs,
+            commands::estimate_repo,
             commands::usage_limits,
             commands::project_metrics,
             commands::project_hourly,

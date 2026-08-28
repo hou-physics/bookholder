@@ -22,6 +22,12 @@ enum Cmd {
     Backfill,
     /// 实时输出新事件（JSON 行）
     Live,
+    /// 估算一个仓库的开发成本（本地路径或 git URL）
+    Estimate {
+        /// 本地目录或 https/git URL
+        target: String,
+        #[arg(long)] json: bool,
+    },
 }
 
 fn open() -> rusqlite::Connection {
@@ -61,6 +67,43 @@ fn main() {
             let today = chrono::Local::now().format("%Y-%m-%d").to_string();
             let _ = bookholder_core::metrics::collect_all(&conn, &today);
             println!("added: {} skipped: {} bad: {}", st.added, st.skipped, st.bad);
+        }
+        Cmd::Estimate { target, json } => {
+            let (path, _tmp);
+            if target.starts_with("http") || target.starts_with("git@") {
+                let tmp = tempfile::tempdir().expect("tempdir");
+                eprintln!("cloning {target} …");
+                let ok = std::process::Command::new("git")
+                    .args(["clone", "--quiet", &target, &tmp.path().to_string_lossy()])
+                    .status().map(|s| s.success()).unwrap_or(false);
+                if !ok { eprintln!("clone failed"); std::process::exit(1); }
+                path = tmp.path().to_path_buf();
+                _tmp = Some(tmp);
+            } else {
+                path = std::path::PathBuf::from(&target);
+                _tmp = None;
+            }
+            match bookholder_core::estimate::estimate(&conn, &path) {
+                Ok(e) => {
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&e).unwrap());
+                    } else {
+                        println!("仓库: {target}");
+                        println!("  翻动行: {}  最终行: {}  提交: {}  构成: {}",
+                            e.stats.churn.map(|c| c.to_string()).unwrap_or("-".into()),
+                            e.stats.code_lines,
+                            e.stats.commits.map(|c| c.to_string()).unwrap_or("-".into()),
+                            e.stats.top_ext);
+                        println!("  口径: {}（校准项目 {} 个，跳过部分覆盖 {} 个）",
+                            if e.basis == "churn" { "翻动行" } else { "最终行（历史不完整，区间放大）" },
+                            e.calibration_projects, e.calibration_skipped);
+                        println!("  估算成本: ${:.0} — ${:.0} — ${:.0}  (P25–P50–P75)",
+                            e.cost_p25, e.cost_p50, e.cost_p75);
+                        println!("  估算 token(P50): {:.1}B", e.tokens_p50 / 1e9);
+                    }
+                }
+                Err(e) => { eprintln!("无法估算: {e}"); std::process::exit(1); }
+            }
         }
         Cmd::Live => {
             let dir = store::claude_projects_dir();

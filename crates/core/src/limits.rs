@@ -150,7 +150,7 @@ pub fn ensure_table(conn: &Connection) -> rusqlite::Result<()> {
 
 pub fn record_samples(conn: &Connection, u: &UsageLimits, now_utc: &str) -> rusqlite::Result<()> {
     ensure_table(conn)?;
-    let mut put = |kind: &str, w: &Option<WindowUsage>| -> rusqlite::Result<()> {
+    let put = |kind: &str, w: &Option<WindowUsage>| -> rusqlite::Result<()> {
         if let Some(w) = w {
             conn.execute(
                 "INSERT OR IGNORE INTO usage_samples (ts, kind, utilization) VALUES (?1, ?2, ?3)",

@@ -62,6 +62,12 @@ export const page: Page = {
           <p class="dim">${t("st.feeHint")}</p>
         </div>
         <div class="panel" style="margin-bottom:10px">
+          <h3>${t("es.title")}</h3>
+          <button id="btn-estimate">${t("es.pick")}</button>
+          <p class="dim">${t("es.hint")}</p>
+          <p id="est-result" style="margin-top:6px"></p>
+        </div>
+        <div class="panel" style="margin-bottom:10px">
           <h3>${t("st.appearance")}</h3>
           <label>${t("st.theme")}
             <select id="sel-theme">
@@ -144,6 +150,16 @@ export const page: Page = {
       rng.addEventListener("change", () => {
         void api.setUiPrefs(null, Number(rng.value) / 100).then(() => broadcastUiPrefsChanged());
       });
+      q("#btn-estimate").addEventListener("click", () => void busy(q("#btn-estimate"), async () => {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const dir = await open({ directory: true });
+        if (!dir || Array.isArray(dir)) return;
+        const e = await api.estimateRepo(dir);
+        const fm = (n: number): string => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : `${(n / 1e6).toFixed(0)}M`);
+        (root.querySelector("#est-result") as HTMLElement).innerHTML =
+          `<b>${t2("es.range", { p25: `$${Math.round(e.cost_p25)}`, p50: `$${Math.round(e.cost_p50)}`, p75: `$${Math.round(e.cost_p75)}`, tok: fm(e.tokens_p50) })}</b><br/>
+           <span class="dim">${t2("es.result", { churn: e.stats.churn ?? "-", loc: e.stats.code_lines, c: e.stats.commits ?? "-", basis: e.basis, n: e.calibration_projects })}</span>`;
+      }));
       q("#btn-quit").addEventListener("click", () => void api.quitApp());
       (root.querySelector("#chk-auto") as HTMLInputElement).addEventListener("change", (e) => {
         const on = (e.target as HTMLInputElement).checked;

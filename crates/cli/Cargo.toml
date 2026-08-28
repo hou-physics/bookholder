@@ -12,6 +12,7 @@ bookholder-core = { path = "../core" }
 clap = { version = "4", features = ["derive"] }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+tempfile = "3"
 rusqlite = { workspace = true }
 
 [dev-dependencies]

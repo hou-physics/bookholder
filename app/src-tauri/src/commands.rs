@@ -1,4 +1,4 @@
-use bookholder_core::{billing, ingest, limits, metrics, pricing, queries, report, store, subscription};
+use bookholder_core::{billing, estimate, ingest, limits, metrics, pricing, queries, report, store, subscription};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -100,6 +100,13 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
         })
         .collect();
     Ok(json!({ "windows": rows, "stale": stale }))
+}
+
+#[tauri::command]
+pub async fn estimate_repo(db: State<'_, Db>, path: String) -> Result<Value, String> {
+    let conn = db.0.lock().unwrap();
+    estimate::estimate(&conn, std::path::Path::new(&path))
+        .map(|e| serde_json::to_value(e).unwrap_or(Value::Null))
 }
 
 #[tauri::command]

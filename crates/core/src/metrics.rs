@@ -12,6 +12,11 @@ pub struct MetricsRow {
     pub code_bytes: i64,
     pub commits: Option<i64>,
     pub top_ext: String, // 如 "rs:41,ts:12,css:3"
+    pub churn: Option<i64>,      // git 历史累计翻动行（插入+删除，排除锁文件/生成物）
+    pub code_lines: i64,         // 代码总行数
+    pub test_lines: i64,         // 测试路径下的行数
+    pub doc_lines: i64,          // Markdown 行数
+    pub loc_by_lang: String,     // 按扩展名的行数 JSON，如 {"rs":5200,"ts":1800}
 }
 
 const SKIP_DIRS: &[&str] = &[
@@ -36,13 +41,44 @@ pub fn ensure_table(conn: &Connection) -> rusqlite::Result<()> {
            top_ext TEXT NOT NULL DEFAULT '',
            PRIMARY KEY (project_id, date)
          );",
-    )
+    )?;
+    // 增量迁移：老库补列（重复添加会报错，逐列忽略）
+    for col in [
+        "ALTER TABLE project_metrics ADD COLUMN churn INTEGER",
+        "ALTER TABLE project_metrics ADD COLUMN code_lines INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE project_metrics ADD COLUMN test_lines INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE project_metrics ADD COLUMN doc_lines INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE project_metrics ADD COLUMN loc_by_lang TEXT NOT NULL DEFAULT ''",
+    ] {
+        let _ = conn.execute(col, []);
+    }
+    Ok(())
 }
 
-fn snapshot_dir(root: &Path) -> (i64, i64, String) {
+/// 目录快照：文件数、字节数、按扩展名文件数 top3、总行数、按语言行数、测试行、文档行。
+pub struct DirSnapshot {
+    pub files: i64,
+    pub bytes: i64,
+    pub top_ext: String,
+    pub code_lines: i64,
+    pub test_lines: i64,
+    pub doc_lines: i64,
+    pub loc_by_lang: String,
+}
+
+fn is_test_path(p: &Path) -> bool {
+    let s = p.to_string_lossy().to_lowercase();
+    s.contains("/test") || s.contains("/spec") || s.contains("__tests__") || s.contains("_test.")
+}
+
+pub fn snapshot_dir(root: &Path) -> DirSnapshot {
     let mut files = 0i64;
     let mut bytes = 0i64;
-    let mut by_ext: HashMap<String, i64> = HashMap::new();
+    let mut code_lines = 0i64;
+    let mut test_lines = 0i64;
+    let mut doc_lines = 0i64;
+    let mut count_by_ext: HashMap<String, i64> = HashMap::new();
+    let mut lines_by_ext: HashMap<String, i64> = HashMap::new();
     let mut stack = vec![root.to_path_buf()];
     let mut visited = 0u32;
     while let Some(dir) = stack.pop() {
@@ -61,22 +97,65 @@ fn snapshot_dir(root: &Path) -> (i64, i64, String) {
             } else if let Some(ext) = p.extension().and_then(|x| x.to_str()) {
                 let ext = ext.to_lowercase();
                 if CODE_EXTS.contains(&ext.as_str()) {
+                    let size = e.metadata().map(|m| m.len() as i64).unwrap_or(0);
                     files += 1;
-                    bytes += e.metadata().map(|m| m.len() as i64).unwrap_or(0);
-                    *by_ext.entry(ext).or_insert(0) += 1;
+                    bytes += size;
+                    *count_by_ext.entry(ext.clone()).or_insert(0) += 1;
+                    if size <= 1_500_000 {
+                        // 行数：>1.5MB 的（多为生成物）不读
+                        let n = std::fs::read(&p)
+                            .map(|b| b.iter().filter(|&&c| c == b'\n').count() as i64)
+                            .unwrap_or(0);
+                        code_lines += n;
+                        *lines_by_ext.entry(ext.clone()).or_insert(0) += n;
+                        if ext == "md" {
+                            doc_lines += n;
+                        } else if is_test_path(&p) {
+                            test_lines += n;
+                        }
+                    }
                 }
             }
         }
     }
-    let mut exts: Vec<(String, i64)> = by_ext.into_iter().collect();
+    let mut exts: Vec<(String, i64)> = count_by_ext.into_iter().collect();
     exts.sort_by(|a, b| b.1.cmp(&a.1));
-    let top = exts
-        .iter()
-        .take(3)
-        .map(|(e, n)| format!("{e}:{n}"))
-        .collect::<Vec<_>>()
-        .join(",");
-    (files, bytes, top)
+    let top = exts.iter().take(3).map(|(e, n)| format!("{e}:{n}")).collect::<Vec<_>>().join(",");
+    let mut ll: Vec<(String, i64)> = lines_by_ext.into_iter().collect();
+    ll.sort_by(|a, b| b.1.cmp(&a.1));
+    let loc_json = serde_json::to_string(
+        &ll.iter().take(8).map(|(k, v)| (k.clone(), *v)).collect::<HashMap<_, _>>(),
+    )
+    .unwrap_or_default();
+    DirSnapshot { files, bytes, top_ext: top, code_lines, test_lines, doc_lines, loc_by_lang: loc_json }
+}
+
+/// git 历史累计翻动行（插入+删除）。排除锁文件与常见生成物；二进制行(numstat 为 "-")跳过。
+pub fn git_churn(root: &Path) -> Option<i64> {
+    let out = std::process::Command::new("git")
+        .args(["-C", &root.to_string_lossy(), "log", "--numstat", "--format="])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let mut total = 0i64;
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let mut it = line.split_whitespace();
+        let (Some(a), Some(d), Some(path)) = (it.next(), it.next(), it.next()) else { continue };
+        let pl = path.to_lowercase();
+        if pl.ends_with(".lock") || pl.ends_with("cargo.lock") || pl.ends_with("package-lock.json")
+            || pl.ends_with("go.sum") || pl.ends_with("yarn.lock") || pl.ends_with("pnpm-lock.yaml")
+            || pl.contains("/gen/") || pl.contains("/icons/") || pl.contains("/dist/")
+            || pl.contains("node_modules/") || pl.contains(".min.")
+        {
+            continue;
+        }
+        if let (Ok(a), Ok(d)) = (a.parse::<i64>(), d.parse::<i64>()) {
+            total += a + d;
+        }
+    }
+    Some(total)
 }
 
 fn git_commit_count(root: &Path) -> Option<i64> {
@@ -116,13 +195,17 @@ pub fn collect_all(conn: &Connection, today_local: &str) -> usize {
         if exists {
             continue;
         }
-        let (files, bytes, top) = snapshot_dir(root);
+        let snap = snapshot_dir(root);
         let commits = git_commit_count(root);
+        let churn = git_churn(root);
         if conn
             .execute(
-                "INSERT OR IGNORE INTO project_metrics (project_id, date, files, code_bytes, commits, top_ext)
-                 VALUES (?1,?2,?3,?4,?5,?6)",
-                params![pid, today_local, files, bytes, commits, top],
+                "INSERT OR IGNORE INTO project_metrics
+                   (project_id, date, files, code_bytes, commits, top_ext,
+                    churn, code_lines, test_lines, doc_lines, loc_by_lang)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                params![pid, today_local, snap.files, snap.bytes, commits, snap.top_ext,
+                        churn, snap.code_lines, snap.test_lines, snap.doc_lines, snap.loc_by_lang],
             )
             .is_ok()
         {
@@ -137,7 +220,9 @@ pub fn latest_for(conn: &Connection, project_id: i64) -> Option<(MetricsRow, i64
     let _ = ensure_table(conn);
     let row = conn
         .query_row(
-            "SELECT date, files, code_bytes, commits, top_ext FROM project_metrics
+            "SELECT date, files, code_bytes, commits, top_ext,
+                    churn, code_lines, test_lines, doc_lines, loc_by_lang
+             FROM project_metrics
              WHERE project_id = ?1 ORDER BY date DESC LIMIT 1",
             [project_id],
             |r| {
@@ -147,6 +232,11 @@ pub fn latest_for(conn: &Connection, project_id: i64) -> Option<(MetricsRow, i64
                     code_bytes: r.get(2)?,
                     commits: r.get(3)?,
                     top_ext: r.get(4)?,
+                    churn: r.get(5)?,
+                    code_lines: r.get(6).unwrap_or(0),
+                    test_lines: r.get(7).unwrap_or(0),
+                    doc_lines: r.get(8).unwrap_or(0),
+                    loc_by_lang: r.get(9).unwrap_or_default(),
                 })
             },
         )

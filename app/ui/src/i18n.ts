@@ -112,6 +112,12 @@ const D: Record<string, [string, string, string]> = {
   "m.commits": ["提交", "commits", "Commits"],
   "m.days": ["快照天数", "snapshot days", "Snapshot-Tage"],
 
+  "es.title": ["仓库成本估算（基于你已监测项目的校准）", "Repo cost estimator (calibrated on your tracked projects)", "Repo-Kostenschätzung (kalibriert an Ihren Projekten)"],
+  "es.pick": ["选择本地仓库…", "Pick a local repo…", "Lokales Repo wählen…"],
+  "es.hint": ["估算 GitHub 项目：先 git clone 到本地再选择该文件夹（完整历史才能算翻动行）。", "For a GitHub project: git clone it locally first, then pick the folder (full history is needed for churn).", "Für GitHub-Projekte: erst lokal klonen, dann Ordner wählen (volle Historie nötig)."],
+  "es.result": ["翻动 {churn} 行 · 最终 {loc} 行 · {c} 提交 ｜ 口径: {basis} ｜ 校准 {n} 项目", "churn {churn} · final {loc} lines · {c} commits | basis: {basis} | {n} calibration projects", "Churn {churn} · final {loc} Zeilen · {c} Commits | Basis: {basis} | {n} Kalibrierungsprojekte"],
+  "es.range": ["估算成本 {p25} – {p50} – {p75}（P25–P50–P75）· 约 {tok} token", "Estimated cost {p25} – {p50} – {p75} (P25–P50–P75) · ~{tok} tokens", "Geschätzt {p25} – {p50} – {p75} (P25–P50–P75) · ~{tok} Tokens"],
+
   // —— 设置 ——
   "st.title": ["设置", "Settings", "Einstellungen"],
   "st.prices": ["价格数据", "Pricing data", "Preisdaten"],

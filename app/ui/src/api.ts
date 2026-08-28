@@ -70,6 +70,12 @@ export const api = {
   setBillingOverride: (mode: string) => invoke<void>("set_billing_override", { mode }),
   sessionsRecent: (limit: number) => invoke<RecentSessionRow[]>("sessions_recent", { limit }),
   projectHourly: (projectId: number) => invoke<HourRow[]>("project_hourly", { projectId }),
+  estimateRepo: (path: string) =>
+    invoke<{
+      stats: { churn: number | null; code_lines: number; files: number; commits: number | null; top_ext: string };
+      basis: string; cost_p25: number; cost_p50: number; cost_p75: number;
+      tokens_p50: number; calibration_projects: number; calibration_skipped: number;
+    }>("estimate_repo", { path }),
   usageLimits: () =>
     invoke<{ windows: LimitWindow[]; stale: boolean }>("usage_limits"),
   projectMetrics: (projectId: number) =>
