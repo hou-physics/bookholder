@@ -67,6 +67,8 @@ function renderSelection(d: FloatData): void {
   el("f-model").textContent = shortModel(cur ? cur.last_model : d.model);
   el("f-proj").textContent = fmtUsd(cur ? cur.total_cost : d.project_cost);
   el("f-proj-label").textContent = multi ? t("f.taskTotal") : t("f.currentProject");
+  const hit = cur ? cur.hit_rate : d.project_hit_rate;
+  el("f-hit").textContent = hit > 0 ? `${t("f.hit")} ${(hit * 100).toFixed(1)}%` : "";
   (el("f-prev") as HTMLButtonElement).style.display = multi ? "" : "none";
   (el("f-next") as HTMLButtonElement).style.display = multi ? "" : "none";
 }
@@ -180,7 +182,7 @@ async function setExpanded(on: boolean): Promise<void> {
   expanded = on;
   el("f-expanded").style.display = on ? "flex" : "none";
   el("f-expand").textContent = on ? "⌃" : "⌄";
-  await win.setSize(new LogicalSize(304, on ? 356 : 236));
+  await win.setSize(new LogicalSize(304, on ? 368 : 248));
 }
 
 // Tauri 的 data-tauri-drag-region 只匹配 mousedown 的精确目标元素，

@@ -156,11 +156,18 @@ pub fn float_data(db: State<Db>) -> Value {
     let project_tokens = proj_totals.as_ref()
         .map(|t| t.input + t.output + t.cache_read + t.cache_write)
         .unwrap_or(0);
+    let project_hit_rate = proj_totals.as_ref()
+        .map(|t| {
+            let denom = t.input + t.cache_read + t.cache_write;
+            if denom > 0 { t.cache_read as f64 / denom as f64 } else { 0.0 }
+        })
+        .unwrap_or(0.0);
     json!({
         "today_cost": today.cost_usd,
         "today_tokens": today.input + today.output + today.cache_read + today.cache_write,
         "project_cost": project_cost,
         "project_tokens": project_tokens,
+        "project_hit_rate": project_hit_rate,
         "project_id": ctx.as_ref().map(|c| c.project_id),
         "project_name": ctx.as_ref().map(|c| c.project_name.clone()).unwrap_or_else(|| "—".into()),
         "model": ctx.as_ref().map(|c| c.model.clone()).unwrap_or_default(),

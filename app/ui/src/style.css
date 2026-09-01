@@ -67,6 +67,7 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .f-nums { display: flex; justify-content: space-between; }
 .f-nums label { display: block; font-size: 10px; color: var(--dim); }
 .f-nums b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.f-hit { display: block; font-size: 9px; line-height: 1.2; }
 .f-arrow { flex: none; width: 16px; height: 16px; line-height: 1; padding: 0; border-radius: 4px; background: transparent; color: var(--dim); font-size: 13px; }
 .f-arrow:hover { background: var(--btn); color: var(--text); }
 .spark { display: flex; align-items: flex-end; gap: 1px; flex: 1; min-height: 24px; }

@@ -222,6 +222,7 @@ pub struct ActiveProjectRow {
     pub recent_cost: f64,
     pub total_cost: f64,
     pub total_tokens: i64,
+    pub hit_rate: f64, // cache_read / (input+cache_read+cache_write)，0–1
     pub last_model: String,
 }
 
@@ -231,6 +232,7 @@ pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
         "SELECT p.id, p.display_name, COALESCE(SUM(e.cost_usd),0),
                 (SELECT COALESCE(SUM(cost_usd),0) FROM usage_events WHERE project_id = p.id),
                 (SELECT COALESCE(SUM(input_tokens + output_tokens + cache_read + cache_write_5m + cache_write_1h),0) FROM usage_events WHERE project_id = p.id),
+                (SELECT COALESCE(CAST(SUM(cache_read) AS REAL) / NULLIF(SUM(input_tokens + cache_read + cache_write_5m + cache_write_1h), 0), 0) FROM usage_events WHERE project_id = p.id),
                 (SELECT model FROM usage_events WHERE project_id = p.id ORDER BY ts DESC LIMIT 1)
          FROM usage_events e JOIN projects p ON p.id = e.project_id
          WHERE e.ts >= datetime('now', ?1)
@@ -238,7 +240,7 @@ pub fn active_projects(conn: &Connection, mins: i64) -> Vec<ActiveProjectRow> {
     ).unwrap();
     stmt.query_map([format!("-{mins} minutes")], |r| Ok(ActiveProjectRow {
         project_id: r.get(0)?, project_name: r.get(1)?, recent_cost: r.get(2)?,
-        total_cost: r.get(3)?, total_tokens: r.get(4)?, last_model: r.get(5)?,
+        total_cost: r.get(3)?, total_tokens: r.get(4)?, hit_rate: r.get(5)?, last_model: r.get(6)?,
     })).map(|it| it.flatten().collect()).unwrap_or_default()
 }
 
