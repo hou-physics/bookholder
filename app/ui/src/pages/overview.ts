@@ -1,5 +1,5 @@
 import { api, fmtUsd, fmtTok, Totals } from "../api";
-import { t as i18nt } from "../i18n";
+import { t as i18nt, t2 as t2i } from "../i18n";
 import { mountChart, palette } from "../charts";
 import type { Page } from "../main";
 
@@ -13,7 +13,7 @@ function card(label: string, t: Totals): string {
 
 export const page: Page = {
   render(root: HTMLElement): void {
-    root.innerHTML = `<div id="o-limits"></div><div id="billing-note"></div><div id="sub-compare"></div><div id="cards" class="cards"></div>
+    root.innerHTML = `<div id="o-limits"></div><div id="billing-note"></div><div id="sub-compare"></div><div id="cards" class="cards"></div><p id="cache-note" class="billing-note" style="display:none"></p>
       <div class="chart-grid">
         <div class="panel"><h3>${i18nt("o.chartDaily")}</h3><div id="c-daily" class="chart"></div></div>
         <div class="panel"><h3>${i18nt("o.chartModels")}</h3><div id="c-models" class="chart"></div></div>
@@ -65,6 +65,17 @@ export const page: Page = {
       }
       document.getElementById("cards")!.innerHTML =
         card(i18nt("o.today"), o.today) + card(i18nt("o.week"), o.week) + card(i18nt("o.month"), o.month) + card(i18nt("o.all"), o.all);
+      const cs = o.cache_savings;
+      if (cs && cs.no_cache_usd > 0 && cs.saved_usd > 0) {
+        const note = document.getElementById("cache-note")!;
+        note.style.display = "block";
+        note.textContent = t2i("o.cacheSaved", {
+          s: `$${Math.round(cs.saved_usd).toLocaleString()}`,
+          p: Math.round((cs.saved_usd / cs.no_cache_usd) * 100),
+          full: `$${Math.round(cs.no_cache_usd).toLocaleString()}`,
+          t: fmtTok(cs.cache_read_tokens),
+        });
+      }
 
       const models = [...new Set(o.daily.map((d) => d.model))];
       const dates = [...new Set(o.daily.map((d) => d.date))].sort();

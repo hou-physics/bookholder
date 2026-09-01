@@ -33,6 +33,7 @@ export interface FloatData {
 export interface Overview {
   today: Totals; week: Totals; month: Totals; all: Totals;
   daily: DailyModelRow[]; models: ModelSplitRow[]; main_cost: number; side_cost: number;
+  cache_savings: { actual_usd: number; no_cache_usd: number; saved_usd: number; cache_read_tokens: number };
 }
 export interface RecentSessionRow {
   id: number; session_id: string; project_name: string; started_at: string;

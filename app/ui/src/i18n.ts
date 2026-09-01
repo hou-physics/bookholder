@@ -87,6 +87,8 @@ const D: Record<string, [string, string, string]> = {
   "o.notAllocated": ["未参与分摊", "not allocated", "nicht umgelegt"],
   "o.fillFeeHint": ["想看订阅实付 vs 等值成本的对比？到<a href=\"#settings\">设置页</a>填一下订阅月费即可。", "Want the actual-vs-equivalent comparison? Enter your subscription fee on the <a href=\"#settings\">settings page</a>.", "Für den Vergleich tatsächlich vs. äquivalent: Abo-Gebühr auf der <a href=\"#settings\">Einstellungsseite</a> eintragen."],
 
+  "o.cacheSaved": ["提示缓存已节省 {s}（-{p}%）—— 无缓存需 {full}，缓存读取 {t} tokens", "Prompt caching saved {s} (-{p}%) — would be {full} uncached · {t} cache-read tokens", "Prompt-Caching sparte {s} (-{p} %) — ohne Cache {full} · {t} Cache-Lese-Tokens"],
+
   // —— 项目页 / 会话 ——
   "p.title": ["项目", "Projects", "Projekte"],
   "p.equiv": ["等值成本", "Equiv. cost", "Äquiv. Kosten"],

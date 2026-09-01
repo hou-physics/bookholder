@@ -186,6 +186,7 @@ pub fn overview(db: State<Db>) -> Value {
         "models": queries::model_split(&conn, None, None),
         "main_cost": main_cost,
         "side_cost": side_cost,
+        "cache_savings": queries::cache_savings(&conn),
     })
 }
 

@@ -105,6 +105,40 @@ pub fn burn_rate_per_hour(conn: &Connection) -> f64 {
     half_hour * 2.0
 }
 
+/// 缓存节省统计：实际成本 vs "假设完全无缓存、全部按 input 全价" 的对照。
+#[derive(Debug, Clone, Serialize)]
+pub struct CacheSavings {
+    pub actual_usd: f64,
+    pub no_cache_usd: f64,
+    pub saved_usd: f64,
+    pub cache_read_tokens: i64,
+}
+
+pub fn cache_savings(conn: &Connection) -> CacheSavings {
+    let rows: Vec<(String, i64, i64, i64, i64, i64, f64)> = conn
+        .prepare(
+            "SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cache_read),
+                    SUM(cache_write_5m), SUM(cache_write_1h), COALESCE(SUM(cost_usd),0)
+             FROM usage_events GROUP BY model",
+        )
+        .and_then(|mut st| {
+            st.query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?))
+            })
+            .map(|it| it.flatten().collect())
+        })
+        .unwrap_or_default();
+    let mut out = CacheSavings { actual_usd: 0.0, no_cache_usd: 0.0, saved_usd: 0.0, cache_read_tokens: 0 };
+    for (model, inp, outp, cr, w5, w1, cost) in rows {
+        let Some(p) = crate::pricing::latest_price(conn, &model) else { continue };
+        out.actual_usd += cost;
+        out.no_cache_usd += (inp + cr + w5 + w1) as f64 * p.input_cost + outp as f64 * p.output_cost;
+        out.cache_read_tokens += cr;
+    }
+    out.saved_usd = out.no_cache_usd - out.actual_usd;
+    out
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelSplitRow { pub model: String, pub cost_usd: f64, pub input: i64, pub output: i64, pub events: i64 }
 
@@ -376,6 +410,30 @@ mod tests {
         assert_eq!(act[0].last_model, "claude-fable-5");
         assert_eq!(act[1].project_name, "warm");
         assert!(act[0].project_id > 0);
+    }
+
+    #[test]
+    fn cache_savings_vs_full_price() {
+        let conn = crate::store::open_memory().unwrap();
+        crate::pricing::upsert_prices(&conn, &[crate::pricing::ModelPrice {
+            model: "claude-x".into(), input_cost: 10e-6, output_cost: 50e-6,
+            cache_read_cost: 1e-6, cache_write_5m_cost: 12.5e-6, cache_write_1h_cost: 20e-6,
+        }], "test", "2026-01-01 00:00:00").unwrap();
+        let e = crate::model::UsageEvent {
+            dedup_key: "k".into(), ts: "2026-08-27T00:00:00Z".into(), session_id: "s".into(),
+            cwd: "/p".into(), model: "claude-x".into(), is_sidechain: false,
+            input_tokens: 1000, output_tokens: 100, thinking_tokens: 0,
+            cache_write_5m: 2000, cache_write_1h: 0, cache_read: 100_000,
+        };
+        // 实际成本 = 1000*10 + 100*50 + 2000*12.5 + 100000*1 (µ$) = 0.14
+        let cost = crate::pricing::cost_usd(&e, &crate::pricing::latest_price(&conn, "claude-x").unwrap());
+        crate::store::record_event(&conn, "-p", &e, Some(cost), "subscription").unwrap();
+        let cs = cache_savings(&conn);
+        assert!((cs.actual_usd - 0.14).abs() < 1e-9, "{}", cs.actual_usd);
+        // 无缓存 = (1000+2000+100000)*10 + 100*50 (µ$) = 1.035
+        assert!((cs.no_cache_usd - 1.035).abs() < 1e-9, "{}", cs.no_cache_usd);
+        assert!((cs.saved_usd - 0.895).abs() < 1e-9);
+        assert_eq!(cs.cache_read_tokens, 100_000);
     }
 
     #[test]
