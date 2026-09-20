@@ -93,8 +93,16 @@ fn keychain_token() -> Result<String, String> {
     }
     let raw = String::from_utf8_lossy(&out.stdout);
     let v: serde_json::Value = serde_json::from_str(raw.trim()).map_err(|e| e.to_string())?;
-    v.get("claudeAiOauth")
-        .and_then(|o| o.get("accessToken"))
+    let oauth = v.get("claudeAiOauth").ok_or("no claudeAiOauth in credential")?;
+    // 钥匙串里的 token 只有 Claude Code 自己运行时才会续期；用户长期只用桌面 app
+    // 会话时它会静默过期 —— 必须给出可行动的错误，而不是拿过期 token 换 4xx。
+    if let Some(exp_ms) = oauth.get("expiresAt").and_then(|e| e.as_i64()) {
+        if exp_ms < chrono::Utc::now().timestamp_millis() {
+            return Err("token_expired".into());
+        }
+    }
+    oauth
+        .get("accessToken")
         .and_then(|t| t.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| "no accessToken in credential".into())
@@ -386,8 +394,11 @@ mod tests {
     fn samples_dedupe_and_prune() {
         let conn = crate::store::open_memory().unwrap();
         let u = parse_usage(FIXTURE).unwrap();
-        record_samples(&conn, &u, "2026-08-27 18:00:00").unwrap();
-        record_samples(&conn, &u, "2026-08-27 18:00:00").unwrap(); // 幂等
+        // 固定日期会随真实时间流逝掉进 14 天清理窗口，改用相对现在的时间戳
+        let ts = (chrono::Utc::now() - chrono::Duration::hours(1))
+            .format("%Y-%m-%d %H:%M:%S").to_string();
+        record_samples(&conn, &u, &ts).unwrap();
+        record_samples(&conn, &u, &ts).unwrap(); // 幂等
         let n: i64 = conn.query_row("SELECT COUNT(*) FROM usage_samples", [], |r| r.get(0)).unwrap();
         assert_eq!(n, 2); // five_hour + seven_day
     }

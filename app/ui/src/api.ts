@@ -78,7 +78,7 @@ export const api = {
       tokens_p50: number; calibration_projects: number; calibration_skipped: number;
     }>("estimate_repo", { path }),
   usageLimits: () =>
-    invoke<{ windows: LimitWindow[]; stale: boolean }>("usage_limits"),
+    invoke<{ windows: LimitWindow[]; stale: boolean; stale_reason: string | null; cache_age_h: number | null }>("usage_limits"),
   projectMetrics: (projectId: number) =>
     invoke<{ latest: { date: string; files: number; code_bytes: number; commits: number | null; top_ext: string }; days: number } | null>("project_metrics", { projectId }),
   subscriptionComparison: () => invoke<SubComparison>("subscription_comparison"),

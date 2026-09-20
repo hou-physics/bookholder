@@ -35,8 +35,11 @@ export const page: Page = {
             <span class="limit-txt dim" style="min-width:190px">${Math.round(pct)}%${resetTxt}${etaTxt}</span></div>`;
         }).join("");
         if (html) {
+          const stale = u.stale
+            ? `<p class="warn" style="margin-top:6px">${t2i("f.staleAge", { age: u.cache_age_h != null ? `${u.cache_age_h.toFixed(1)}h` : "?" })}${u.stale_reason === "token_expired" ? ` · ${i18nt("f.staleToken")}` : ""}</p>`
+            : "";
           document.getElementById("o-limits")!.innerHTML =
-            `<div class="panel" style="margin-bottom:12px"><h3>${i18nt("o.limits")}</h3>${html}</div>`;
+            `<div class="panel" style="margin-bottom:12px;${u.stale ? "opacity:.65" : ""}"><h3>${i18nt("o.limits")}</h3>${html}${stale}</div>`;
         }
       }).catch(() => {});
       if (sc.equiv_usd > 0) {

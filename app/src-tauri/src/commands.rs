@@ -52,6 +52,7 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
         if fresh { store::meta_get(&conn, "usage_cache_json") } else { None }
     };
     let mut stale = false;
+    let mut stale_reason: Option<String> = None;
     let body = match cached {
         Some(b) => b,
         None => match limits::fetch_usage_json() { // 网络在锁外
@@ -70,7 +71,7 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
                 // 完全没有缓存才把错误抛给前端。
                 let conn = db.0.lock().unwrap();
                 match store::meta_get(&conn, "usage_cache_json") {
-                    Some(b) => { stale = true; b }
+                    Some(b) => { stale = true; stale_reason = Some(e); b }
                     None => return Err(e),
                 }
             }
@@ -99,7 +100,11 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
             })
         })
         .collect();
-    Ok(json!({ "windows": rows, "stale": stale }))
+    // 缓存年龄（小时）：stale 时前端据此显示"N 前的数据"
+    let cache_age_h: Option<f64> = store::meta_get(&conn, "usage_cache_ts")
+        .and_then(|t| chrono::NaiveDateTime::parse_from_str(&t, "%Y-%m-%d %H:%M:%S").ok())
+        .map(|t| (chrono::Utc::now().naive_utc() - t).num_seconds() as f64 / 3600.0);
+    Ok(json!({ "windows": rows, "stale": stale, "stale_reason": stale_reason, "cache_age_h": cache_age_h }))
 }
 
 #[tauri::command]

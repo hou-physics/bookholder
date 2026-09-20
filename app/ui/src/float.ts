@@ -105,6 +105,16 @@ async function refreshLimits(): Promise<void> {
         <span class="limit-est">${t("f.est")} ${w.eta_days != null ? `${w.eta_days.toFixed(1)}${t("f.workDays")}` : w.eta_h != null ? fmtDur(w.eta_h) : "—"}</span>`;
       box.appendChild(row);
     }
+    if (u.stale) {
+      // 明确告知数据陈旧及可行动的修复方式，而不是只靠透明度暗示
+      const note = document.createElement("div");
+      note.className = "f-stale";
+      const age = u.cache_age_h != null ? fmtDur(u.cache_age_h) : "?";
+      note.textContent = t2("f.staleAge", { age }) +
+        (u.stale_reason === "token_expired" ? ` · ${t("f.staleToken")}` : "");
+      note.title = u.stale_reason ?? "";
+      box.appendChild(note);
+    }
   } catch {
     box.innerHTML = `<div class="f-eta dim">${t("f.limitErr")}</div>`;
   }

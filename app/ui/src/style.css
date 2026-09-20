@@ -88,6 +88,7 @@ body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--
 .limit-fill.hot { background: var(--warn); }
 .limit-fill.crit { background: #c4554a; }
 .limit-txt { text-align: right; font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.f-stale { font-size: 9px; color: var(--warn); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-eta { font-size: 10px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-mini { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #f-expanded { display: none; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
