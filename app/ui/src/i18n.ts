@@ -60,7 +60,11 @@ const D: Record<string, [string, string, string]> = {
   "f.exhaust": ["耗尽", "empty", "leer"],
   "f.limitErr": ["用量接口不可用（钥匙串未授权？）", "usage API unavailable (keychain denied?)", "Usage-API nicht verfügbar (Schlüsselbund?)"],
   "f.staleAge": ["{age} 前的数据", "data from {age} ago", "Daten von vor {age}"],
-  "f.staleToken": ["凭证已过期——在终端运行一次 claude 即可恢复", "login token expired — run claude once in a terminal to fix", "Token abgelaufen — einmal claude im Terminal ausführen"],
+  "f.staleToken": ["凭证已过期", "login token expired", "Token abgelaufen"],
+  "f.refreshLogin": ["重新登录", "Re-login", "Neu anmelden"],
+  "f.refreshing": ["登录中…", "Logging in…", "Anmeldung…"],
+  "f.refreshOk": ["已恢复", "Fixed", "Behoben"],
+  "f.refreshFail": ["失败：{e}", "Failed: {e}", "Fehlgeschlagen: {e}"],
   "o.limits": ["订阅限额", "Subscription limits", "Abo-Kontingente"],
 
   // —— 总览 ——

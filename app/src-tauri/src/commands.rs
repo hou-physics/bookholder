@@ -40,6 +40,16 @@ pub fn set_ui_prefs(db: State<Db>, theme: Option<String>, opacity: Option<f64>, 
     Ok(())
 }
 
+/// GUI 按钮版"去终端敲 claude 命令"：跑一次最小 CLI 调用续期钥匙串里的登录 token，
+/// 成功后清掉用量缓存时间戳，让下次 usage_limits 立即重新拉取而不是等 60 秒节流。
+#[tauri::command]
+pub async fn refresh_login(db: State<'_, Db>) -> Result<(), String> {
+    limits::refresh_login()?;
+    let conn = db.0.lock().unwrap();
+    let _ = store::meta_set(&conn, "usage_cache_ts", "1970-01-01 00:00:00");
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
     // 60 秒节流：新鲜缓存直接返回，避免每次悬浮窗刷新都打接口

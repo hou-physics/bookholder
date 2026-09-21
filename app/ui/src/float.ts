@@ -87,6 +87,20 @@ function limitLabel(w: { kind: string; scope: string | null }): string {
   return `${t("f.winWeekPrefix")}${w.scope ?? w.kind}`;
 }
 
+// GUI 按钮换终端命令：跑一次最小 CLI 调用续期钥匙串 token，成功后立即重拉用量。
+async function doRelogin(btn: HTMLButtonElement): Promise<void> {
+  btn.disabled = true;
+  btn.textContent = t("f.refreshing");
+  try {
+    await api.refreshLogin();
+    btn.textContent = t("f.refreshOk");
+    await refreshLimits();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = t2("f.refreshFail", { e: String(e) });
+  }
+}
+
 async function refreshLimits(): Promise<void> {
   const box = el("f-limits");
   try {
@@ -106,13 +120,23 @@ async function refreshLimits(): Promise<void> {
       box.appendChild(row);
     }
     if (u.stale) {
-      // 明确告知数据陈旧及可行动的修复方式，而不是只靠透明度暗示
+      // 明确告知数据陈旧及可行动的修复方式，而不是只靠透明度暗示；
+      // 过期 token 直接给一个 GUI 按钮修——不用去终端敲命令。
       const note = document.createElement("div");
       note.className = "f-stale";
       const age = u.cache_age_h != null ? fmtDur(u.cache_age_h) : "?";
-      note.textContent = t2("f.staleAge", { age }) +
+      const label = document.createElement("span");
+      label.textContent = t2("f.staleAge", { age }) +
         (u.stale_reason === "token_expired" ? ` · ${t("f.staleToken")}` : "");
-      note.title = u.stale_reason ?? "";
+      label.title = u.stale_reason ?? "";
+      note.appendChild(label);
+      if (u.stale_reason === "token_expired") {
+        const btn = document.createElement("button");
+        btn.id = "f-relogin";
+        btn.className = "f-relogin-btn";
+        btn.textContent = t("f.refreshLogin");
+        note.appendChild(btn);
+      }
       box.appendChild(note);
     }
   } catch {
@@ -207,6 +231,7 @@ document.body.addEventListener("mousedown", (e) => {
     else if (btn.id === "f-expand") void setExpanded(!expanded);
     else if (btn.id === "f-prev") cycle(-1);
     else if (btn.id === "f-next") cycle(1);
+    else if (btn.id === "f-relogin") void doRelogin(btn as HTMLButtonElement);
     return;
   }
   if (e.detail >= 2) {

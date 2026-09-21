@@ -19,8 +19,7 @@ export const page: Page = {
         <div class="panel"><h3>${i18nt("o.chartModels")}</h3><div id="c-models" class="chart"></div></div>
         <div class="panel"><h3>${i18nt("o.chartSide")}</h3><div id="c-side" class="chart chart-slim"></div></div>
       </div>`;
-    void (async () => {
-      const [o, s, sc] = await Promise.all([api.overview(), api.settings(), api.subscriptionComparison()]);
+    const renderLimits = (): void => {
       void api.usageLimits().then((u) => {
         const label = (w: { kind: string; scope: string | null }): string =>
           w.kind === "session" ? i18nt("f.win5h") : w.kind === "weekly_all" ? i18nt("f.winWeekAll") : `${i18nt("f.winWeekPrefix")}${w.scope ?? w.kind}`;
@@ -36,12 +35,27 @@ export const page: Page = {
         }).join("");
         if (html) {
           const stale = u.stale
-            ? `<p class="warn" style="margin-top:6px">${t2i("f.staleAge", { age: u.cache_age_h != null ? `${u.cache_age_h.toFixed(1)}h` : "?" })}${u.stale_reason === "token_expired" ? ` · ${i18nt("f.staleToken")}` : ""}</p>`
+            ? `<p class="warn" style="margin-top:6px;display:flex;align-items:center;gap:8px">
+                 <span>${t2i("f.staleAge", { age: u.cache_age_h != null ? `${u.cache_age_h.toFixed(1)}h` : "?" })}${u.stale_reason === "token_expired" ? ` · ${i18nt("f.staleToken")}` : ""}</span>
+                 ${u.stale_reason === "token_expired" ? `<button id="o-relogin">${i18nt("f.refreshLogin")}</button>` : ""}
+               </p>`
             : "";
           document.getElementById("o-limits")!.innerHTML =
             `<div class="panel" style="margin-bottom:12px;${u.stale ? "opacity:.65" : ""}"><h3>${i18nt("o.limits")}</h3>${html}${stale}</div>`;
+          document.getElementById("o-relogin")?.addEventListener("click", (ev) => {
+            const btn = ev.currentTarget as HTMLButtonElement;
+            btn.disabled = true;
+            btn.textContent = i18nt("f.refreshing");
+            api.refreshLogin()
+              .then(() => { btn.textContent = i18nt("f.refreshOk"); renderLimits(); })
+              .catch((e) => { btn.disabled = false; btn.textContent = t2i("f.refreshFail", { e: String(e) }); });
+          });
         }
       }).catch(() => {});
+    };
+    void (async () => {
+      const [o, s, sc] = await Promise.all([api.overview(), api.settings(), api.subscriptionComparison()]);
+      renderLimits();
       if (sc.equiv_usd > 0) {
         const subEl = document.getElementById("sub-compare")!;
         if (sc.fees.length === 0) {

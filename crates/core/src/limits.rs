@@ -108,6 +108,52 @@ fn keychain_token() -> Result<String, String> {
         .ok_or_else(|| "no accessToken in credential".into())
 }
 
+/// 定位本机 `claude` CLI 可执行文件：打包后的 app 由 Finder/launchd 启动，
+/// PATH 里没有用户 shell 配置文件加过的目录（nvm/homebrew/~/.local/bin 等），
+/// 所以先探测常见安装位置，探测不到再用登录 shell 展开 PATH 兜底。
+fn locate_claude_cli() -> Option<String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{home}/.local/bin/claude"),
+        format!("{home}/.claude/local/claude"),
+        "/opt/homebrew/bin/claude".to_string(),
+        "/usr/local/bin/claude".to_string(),
+    ];
+    for c in candidates {
+        if std::path::Path::new(&c).exists() {
+            return Some(c);
+        }
+    }
+    let out = std::process::Command::new("zsh")
+        .args(["-lc", "command -v claude"])
+        .output()
+        .ok()?;
+    let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (out.status.success() && !path.is_empty()).then_some(path)
+}
+
+/// 用一次最小化的 CLI 调用换取钥匙串里 token 的续期——GUI 按钮替代
+/// "去终端敲 claude 命令"，用户不需要记命令行。token 只在钥匙串里更新，
+/// 本进程不读取、不留存它。
+pub fn refresh_login() -> Result<(), String> {
+    let bin = locate_claude_cli().ok_or("未找到 claude 命令行工具（claude CLI not found on this machine）")?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = std::process::Command::new(&bin)
+            .args(["-p", "ok", "--model", "haiku"])
+            .output();
+        let _ = tx.send(result);
+    });
+    let out = rx
+        .recv_timeout(std::time::Duration::from_secs(45))
+        .map_err(|_| "刷新超时（45s）".to_string())?
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    Ok(())
+}
+
 pub fn fetch_usage_json() -> Result<String, String> {
     let token = keychain_token()?;
     let agent = ureq::AgentBuilder::new()

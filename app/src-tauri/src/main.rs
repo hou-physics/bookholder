@@ -36,6 +36,7 @@ fn main() {
             commands::set_ui_prefs,
             commands::estimate_repo,
             commands::usage_limits,
+            commands::refresh_login,
             commands::project_metrics,
             commands::project_hourly,
             commands::sessions_recent,
