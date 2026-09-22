@@ -83,7 +83,7 @@ pub fn record_window_samples(conn: &Connection, ws: &[LimitWindow], now_utc: &st
 
 pub const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 
-fn keychain_token() -> Result<String, String> {
+fn read_oauth_json() -> Result<serde_json::Value, String> {
     let out = std::process::Command::new("security")
         .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
         .output()
@@ -93,7 +93,13 @@ fn keychain_token() -> Result<String, String> {
     }
     let raw = String::from_utf8_lossy(&out.stdout);
     let v: serde_json::Value = serde_json::from_str(raw.trim()).map_err(|e| e.to_string())?;
-    let oauth = v.get("claudeAiOauth").ok_or("no claudeAiOauth in credential")?;
+    v.get("claudeAiOauth")
+        .cloned()
+        .ok_or_else(|| "no claudeAiOauth in credential".into())
+}
+
+fn keychain_token() -> Result<String, String> {
+    let oauth = read_oauth_json()?;
     // 钥匙串里的 token 只有 Claude Code 自己运行时才会续期；用户长期只用桌面 app
     // 会话时它会静默过期 —— 必须给出可行动的错误，而不是拿过期 token 换 4xx。
     if let Some(exp_ms) = oauth.get("expiresAt").and_then(|e| e.as_i64()) {
@@ -106,6 +112,17 @@ fn keychain_token() -> Result<String, String> {
         .and_then(|t| t.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| "no accessToken in credential".into())
+}
+
+/// token 距过期还剩多少秒（负数=已过期），不经网络、只读钥匙串。
+/// 供后台保活线程判断是否该提前续期。
+pub fn token_remaining_secs() -> Result<i64, String> {
+    let oauth = read_oauth_json()?;
+    let exp_ms = oauth
+        .get("expiresAt")
+        .and_then(|e| e.as_i64())
+        .ok_or("no expiresAt in credential")?;
+    Ok((exp_ms - chrono::Utc::now().timestamp_millis()) / 1000)
 }
 
 /// 定位本机 `claude` CLI 可执行文件：打包后的 app 由 Finder/launchd 启动，

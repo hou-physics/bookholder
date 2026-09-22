@@ -90,6 +90,7 @@ fn main() {
                 let _ = pricing::reprice_null_costs(&conn);
                 let _ = handle.emit("usage-updated", &st);
                 maybe_refresh_prices(&conn);
+                maybe_refresh_login();
                 let today = chrono::Local::now().format("%Y-%m-%d").to_string();
                 let _ = bookholder_core::metrics::collect_all(&conn, &today);
 
@@ -108,6 +109,7 @@ fn main() {
                 match guard {
                     Ok(_g) => loop {
                         std::thread::sleep(std::time::Duration::from_secs(3600));
+                        maybe_refresh_login();
                         if let Ok(c) = store::open_db(&db_path) {
                             maybe_refresh_prices(&c);
                             let today = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -138,6 +140,18 @@ fn tray_log(msg: &str) {
     if let Some(dir) = store::default_db_path().parent().map(|p| p.to_path_buf()) {
         if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("tray.log")) {
             let _ = writeln!(f, "{} {msg}", chrono::Local::now().format("%H:%M:%S%.3f"));
+        }
+    }
+}
+
+/// 登录 token 保活：实测有效期只有几小时，只靠悬浮窗按钮等用户发现太晚。
+/// 后台线程每次醒来都检查一次剩余时间，快过期就提前静默续期，用户全程无感——
+/// 不需要设置"每天几点刷新"，续期节奏自动贴合 token 实际寿命。
+fn maybe_refresh_login() {
+    const REFRESH_MARGIN_SECS: i64 = 3 * 3600; // 剩余 < 3 小时就提前续，留够余量
+    if let Ok(remaining) = bookholder_core::limits::token_remaining_secs() {
+        if remaining < REFRESH_MARGIN_SECS {
+            let _ = bookholder_core::limits::refresh_login();
         }
     }
 }
