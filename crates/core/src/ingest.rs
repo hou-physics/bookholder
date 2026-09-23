@@ -53,6 +53,9 @@ pub fn ingest_file(conn: &Connection, path: &Path, slug: &str, billing: &str) ->
         let line = line_str.trim();
         if line.is_empty() { continue; }
         match parse_line(line) {
+            // 本工具早期版本的 token 保活调用曾在文件系统根目录下留下 "ok" 会话；
+            // 没有人在 "/" 下开发，整体当作自身噪声跳过（现版本保活不再写转录）。
+            ParseOutcome::Event(e) if e.cwd == "/" => st.skipped += 1,
             ParseOutcome::Event(e) => {
                 let cost = crate::pricing::latest_price(conn, &e.model)
                     .map(|p| crate::pricing::cost_usd(&e, &p));
@@ -131,6 +134,18 @@ mod tests {
         assert_eq!((st.added, st.skipped, st.bad), (1, 1, 1));
         let slug: String = conn.query_row("SELECT slug FROM projects", [], |r| r.get(0)).unwrap();
         assert_eq!(slug, "-Users-me-alpha");
+    }
+
+    #[test]
+    fn root_cwd_keepalive_noise_is_skipped() {
+        let (dir, file) = setup();
+        let root = L1.replace("/Users/me/alpha", "/").replace("\"r1\"", "\"r9\"").replace("\"m1\"", "\"m9\"");
+        fs::write(&file, format!("{L1}\n{root}\n")).unwrap();
+        let conn = crate::store::open_memory().unwrap();
+        let st = scan_all(&conn, dir.path(), "api");
+        assert_eq!((st.added, st.skipped), (1, 1));
+        let n: i64 = conn.query_row("SELECT COUNT(*) FROM usage_events", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 1);
     }
 
     #[test]

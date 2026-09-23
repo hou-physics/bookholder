@@ -119,24 +119,31 @@ async function refreshLimits(): Promise<void> {
         <span class="limit-est">${t("f.est")} ${w.eta_days != null ? `${w.eta_days.toFixed(1)}${t("f.workDays")}` : w.eta_h != null ? fmtDur(w.eta_h) : "—"}</span>`;
       box.appendChild(row);
     }
-    if (u.stale) {
-      // 明确告知数据陈旧及可行动的修复方式，而不是只靠透明度暗示；
-      // 过期 token 直接给一个 GUI 按钮修——不用去终端敲命令。
+    // 三种可行动状态，都给 GUI 按钮而不是让用户去终端：
+    //  login_required —— refresh token 到期（约 7 天一次），只能浏览器重登：按钮开终端
+    //  token_expired  —— 后台保活没赶上：按钮当场续期
+    //  登录即将到期    —— 数据仍新鲜，但提前一天提醒去登录
+    const loginSoon = u.login_expires_h != null && u.login_expires_h < 24;
+    if (u.stale || loginSoon) {
       const note = document.createElement("div");
       note.className = "f-stale";
-      const age = u.cache_age_h != null ? fmtDur(u.cache_age_h) : "?";
       const label = document.createElement("span");
-      label.textContent = t2("f.staleAge", { age }) +
-        (u.stale_reason === "token_expired" ? ` · ${t("f.staleToken")}` : "");
-      label.title = u.stale_reason ?? "";
-      note.appendChild(label);
-      if (u.stale_reason === "token_expired") {
-        const btn = document.createElement("button");
-        btn.id = "f-relogin";
-        btn.className = "f-relogin-btn";
-        btn.textContent = t("f.refreshLogin");
-        note.appendChild(btn);
+      const btn = document.createElement("button");
+      btn.className = "f-relogin-btn";
+      if (u.stale_reason === "login_required") {
+        label.textContent = t("f.loginRequired");
+        btn.id = "f-gologin"; btn.textContent = t("f.goLogin"); btn.title = t("f.goLoginTip");
+      } else if (u.stale) {
+        const age = u.cache_age_h != null ? fmtDur(u.cache_age_h) : "?";
+        label.textContent = t2("f.staleAge", { age }) + (u.stale_reason === "token_expired" ? ` · ${t("f.staleToken")}` : "");
+        label.title = u.stale_reason ?? "";
+        if (u.stale_reason === "token_expired") { btn.id = "f-relogin"; btn.textContent = t("f.refreshLogin"); }
+      } else {
+        label.textContent = t2("f.loginExpiring", { h: fmtDur(Math.max(0, u.login_expires_h!)) });
+        btn.id = "f-gologin"; btn.textContent = t("f.goLogin"); btn.title = t("f.goLoginTip");
       }
+      note.appendChild(label);
+      if (btn.id) note.appendChild(btn);
       box.appendChild(note);
     }
   } catch {
@@ -232,6 +239,7 @@ document.body.addEventListener("mousedown", (e) => {
     else if (btn.id === "f-prev") cycle(-1);
     else if (btn.id === "f-next") cycle(1);
     else if (btn.id === "f-relogin") void doRelogin(btn as HTMLButtonElement);
+    else if (btn.id === "f-gologin") void api.openLoginTerminal();
     return;
   }
   if (e.detail >= 2) {

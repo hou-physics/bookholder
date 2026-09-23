@@ -98,14 +98,48 @@ fn read_oauth_json() -> Result<serde_json::Value, String> {
         .ok_or_else(|| "no claudeAiOauth in credential".into())
 }
 
+/// 钥匙串凭证的两层寿命：access token 只活几小时（CLI 跑一次就续）；
+/// refresh token 固定约 7 天、不随续期滚动，到期后 CLI 会把两者清空——
+/// 那时任何自动续期都无效，只能重新走浏览器登录。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CredentialStatus {
+    pub access_remaining_secs: i64,
+    /// None = 凭证里没有该字段
+    pub refresh_remaining_secs: Option<i64>,
+    /// false = token 已被清空 / refresh token 已到期：需要用户重新登录
+    pub renewable: bool,
+}
+
+pub fn credential_status() -> Result<CredentialStatus, String> {
+    let oauth = read_oauth_json()?;
+    Ok(status_from_oauth(&oauth))
+}
+
+fn status_from_oauth(oauth: &serde_json::Value) -> CredentialStatus {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let ms = |k: &str| oauth.get(k).and_then(|e| e.as_i64());
+    let access_remaining_secs = (ms("expiresAt").unwrap_or(0) - now_ms) / 1000;
+    let refresh_remaining_secs = ms("refreshTokenExpiresAt").map(|e| (e - now_ms) / 1000);
+    let has_tokens = ["accessToken", "refreshToken"]
+        .iter()
+        .all(|k| oauth.get(k).and_then(|t| t.as_str()).map(|s| !s.is_empty()).unwrap_or(false));
+    CredentialStatus {
+        access_remaining_secs,
+        refresh_remaining_secs,
+        renewable: has_tokens && refresh_remaining_secs.map(|r| r > 0).unwrap_or(true),
+    }
+}
+
+/// 错误码约定（前端据此选提示与按钮）：
+/// `login_required` = 需要重新登录（自动续无效）；`token_expired` = 自动续期即可恢复。
 fn keychain_token() -> Result<String, String> {
     let oauth = read_oauth_json()?;
-    // 钥匙串里的 token 只有 Claude Code 自己运行时才会续期；用户长期只用桌面 app
-    // 会话时它会静默过期 —— 必须给出可行动的错误，而不是拿过期 token 换 4xx。
-    if let Some(exp_ms) = oauth.get("expiresAt").and_then(|e| e.as_i64()) {
-        if exp_ms < chrono::Utc::now().timestamp_millis() {
-            return Err("token_expired".into());
-        }
+    let st = status_from_oauth(&oauth);
+    if !st.renewable {
+        return Err("login_required".into());
+    }
+    if st.access_remaining_secs <= 0 {
+        return Err("token_expired".into());
     }
     oauth
         .get("accessToken")
@@ -115,14 +149,8 @@ fn keychain_token() -> Result<String, String> {
 }
 
 /// token 距过期还剩多少秒（负数=已过期），不经网络、只读钥匙串。
-/// 供后台保活线程判断是否该提前续期。
 pub fn token_remaining_secs() -> Result<i64, String> {
-    let oauth = read_oauth_json()?;
-    let exp_ms = oauth
-        .get("expiresAt")
-        .and_then(|e| e.as_i64())
-        .ok_or("no expiresAt in credential")?;
-    Ok((exp_ms - chrono::Utc::now().timestamp_millis()) / 1000)
+    credential_status().map(|s| s.access_remaining_secs)
 }
 
 /// 定位本机 `claude` CLI 可执行文件：打包后的 app 由 Finder/launchd 启动，
@@ -153,11 +181,21 @@ fn locate_claude_cli() -> Option<String> {
 /// "去终端敲 claude 命令"，用户不需要记命令行。token 只在钥匙串里更新，
 /// 本进程不读取、不留存它。
 pub fn refresh_login() -> Result<(), String> {
+    // refresh token 已到期时 CLI 只会打印 "could not be refreshed"——别白跑一次
+    if let Ok(st) = credential_status() {
+        if !st.renewable {
+            return Err("login_required".into());
+        }
+    }
     let bin = locate_claude_cli().ok_or("未找到 claude 命令行工具（claude CLI not found on this machine）")?;
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
+        // --no-session-persistence：不写转录，否则这些 "ok" 会话会被本工具
+        // 自己当成项目用量统计进去；--tools/--setting-sources 置空：
+        // 不带工具定义和插件 hook，把这次续期调用的 token 消耗压到最低。
+        // 不能用 --bare：它跳过钥匙串、只认 API key。
         let result = std::process::Command::new(&bin)
-            .args(["-p", "ok", "--model", "haiku"])
+            .args(["-p", "ok", "--model", "haiku", "--no-session-persistence", "--tools", "", "--setting-sources", ""])
             .output();
         let _ = tx.send(result);
     });
@@ -165,10 +203,42 @@ pub fn refresh_login() -> Result<(), String> {
         .recv_timeout(std::time::Duration::from_secs(45))
         .map_err(|_| "刷新超时（45s）".to_string())?
         .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    if stdout.contains("Failed to authenticate") {
+        return Err("login_required".into());
     }
-    Ok(())
+    if !out.status.success() {
+        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(if msg.is_empty() { stdout.trim().to_string() } else { msg });
+    }
+    // CLI 退出码不可靠（认证失败也可能是 0）：以钥匙串里的实际结果为准
+    match credential_status() {
+        Ok(st) if st.renewable && st.access_remaining_secs > 0 => Ok(()),
+        Ok(st) if !st.renewable => Err("login_required".into()),
+        Ok(_) => Err("CLI 调用成功但 token 未更新".into()),
+        Err(e) => Err(e),
+    }
+}
+
+/// 需要浏览器登录时的 GUI 出口：生成一个 .command 脚本并交给系统打开——
+/// macOS 会用 Terminal 运行它，`claude auth login` 随即拉起浏览器授权。
+/// 不走 AppleScript（需要辅助功能/自动化权限，且会被系统随时重置）。
+pub fn open_login_terminal(data_dir: &std::path::Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let bin = locate_claude_cli().ok_or("未找到 claude 命令行工具（claude CLI not found on this machine）")?;
+    let script = data_dir.join("relogin.command");
+    std::fs::write(
+        &script,
+        format!("#!/bin/zsh\necho 'Bookholder: 正在重新登录 Claude Code…'\n\"{bin}\" auth login\necho\necho '登录完成后可以关闭这个窗口。'\n"),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+    let ok = std::process::Command::new("open")
+        .arg(&script)
+        .status()
+        .map_err(|e| e.to_string())?
+        .success();
+    ok.then_some(()).ok_or_else(|| "无法打开终端".into())
 }
 
 pub fn fetch_usage_json() -> Result<String, String> {
@@ -359,6 +429,28 @@ mod tests {
       "seven_day_sonnet": {"utilization": 4.5, "resets_at": null},
       "extra_usage": {"is_enabled": false}
     }"#;
+
+    #[test]
+    fn credential_status_distinguishes_renewable_from_login_required() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mk = |access: &str, refresh: &str, exp: i64, rexp: i64| {
+            status_from_oauth(&serde_json::json!({
+                "accessToken": access, "refreshToken": refresh,
+                "expiresAt": exp, "refreshTokenExpiresAt": rexp,
+            }))
+        };
+        // access 已过期但 refresh 仍有效 → 可自动续
+        let s = mk("a", "r", now - 3_600_000, now + 86_400_000);
+        assert!(s.renewable && s.access_remaining_secs < 0);
+        // CLI 清空了 token（refresh 到期后的真实形态）→ 必须重新登录
+        let s = mk("", "", 0, now - 1000);
+        assert!(!s.renewable);
+        // token 还在但 refresh 已到期 → 同样必须重新登录
+        assert!(!mk("a", "r", now + 3_600_000, now - 1000).renewable);
+        // 没有 refreshTokenExpiresAt 字段：不臆断，视为可续
+        let s = status_from_oauth(&serde_json::json!({"accessToken": "a", "refreshToken": "r", "expiresAt": now + 1000}));
+        assert!(s.renewable && s.refresh_remaining_secs.is_none());
+    }
 
     #[test]
     fn parses_real_shape() {

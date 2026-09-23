@@ -50,6 +50,13 @@ pub async fn refresh_login(db: State<'_, Db>) -> Result<(), String> {
     Ok(())
 }
 
+/// refresh token 到期（约每 7 天）后自动续无效：一键打开终端走浏览器登录。
+#[tauri::command]
+pub async fn open_login_terminal() -> Result<(), String> {
+    let dir = store::default_db_path().parent().map(|p| p.to_path_buf()).ok_or("no data dir")?;
+    limits::open_login_terminal(&dir)
+}
+
 #[tauri::command]
 pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
     // 60 秒节流：新鲜缓存直接返回，避免每次悬浮窗刷新都打接口
@@ -114,7 +121,16 @@ pub async fn usage_limits(db: State<'_, Db>) -> Result<Value, String> {
     let cache_age_h: Option<f64> = store::meta_get(&conn, "usage_cache_ts")
         .and_then(|t| chrono::NaiveDateTime::parse_from_str(&t, "%Y-%m-%d %H:%M:%S").ok())
         .map(|t| (chrono::Utc::now().naive_utc() - t).num_seconds() as f64 / 3600.0);
-    Ok(json!({ "windows": rows, "stale": stale, "stale_reason": stale_reason, "cache_age_h": cache_age_h }))
+    // 登录（refresh token）还剩多少小时：到期前一天开始提醒，别等断了才发现
+    let login_expires_h: Option<f64> = limits::credential_status()
+        .ok()
+        .filter(|s| s.renewable)
+        .and_then(|s| s.refresh_remaining_secs)
+        .map(|s| s as f64 / 3600.0);
+    Ok(json!({
+        "windows": rows, "stale": stale, "stale_reason": stale_reason,
+        "cache_age_h": cache_age_h, "login_expires_h": login_expires_h,
+    }))
 }
 
 #[tauri::command]

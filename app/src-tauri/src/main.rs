@@ -37,6 +37,7 @@ fn main() {
             commands::estimate_repo,
             commands::usage_limits,
             commands::refresh_login,
+            commands::open_login_terminal,
             commands::project_metrics,
             commands::project_hourly,
             commands::sessions_recent,
@@ -149,8 +150,10 @@ fn tray_log(msg: &str) {
 /// 不需要设置"每天几点刷新"，续期节奏自动贴合 token 实际寿命。
 fn maybe_refresh_login() {
     const REFRESH_MARGIN_SECS: i64 = 3 * 3600; // 剩余 < 3 小时就提前续，留够余量
-    if let Ok(remaining) = bookholder_core::limits::token_remaining_secs() {
-        if remaining < REFRESH_MARGIN_SECS {
+    if let Ok(st) = bookholder_core::limits::credential_status() {
+        // refresh token 到期后自动续必然失败（还会每小时白跑一次 CLI）：
+        // 交给界面提示用户重新登录
+        if st.renewable && st.access_remaining_secs < REFRESH_MARGIN_SECS {
             let _ = bookholder_core::limits::refresh_login();
         }
     }
